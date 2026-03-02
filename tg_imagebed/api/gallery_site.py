@@ -67,9 +67,10 @@ _GALLERY_LIST_SQL = '''
             JOIN file_storage fs ON gi2.encrypted_id = fs.encrypted_id
             WHERE gi2.gallery_id = g.id
             ORDER BY gi2.added_at ASC LIMIT 1
-        )) AS cover_image
+        )) AS cover_image,
+        g.access_mode
     FROM galleries g
-    WHERE g.share_enabled = 1 AND g.access_mode = 'public'
+    WHERE g.share_enabled = 1 AND g.access_mode != 'admin_only'
     ORDER BY g.updated_at DESC
 '''
 
@@ -130,7 +131,7 @@ def gallery_site_list():
             # 统计总数
             cursor.execute('''
                 SELECT COUNT(*) FROM galleries
-                WHERE share_enabled = 1 AND access_mode = 'public'
+                WHERE share_enabled = 1 AND access_mode != 'admin_only'
             ''')
             total = cursor.fetchone()[0]
 
@@ -641,7 +642,7 @@ def gallery_admin_settings():
             if key in data:
                 raw = data[key]
                 if key == 'gallery_site_enabled':
-                    value = '1' if raw else '0'
+                    value = '1' if raw == '1' or raw is True else '0'
                 elif key == 'gallery_site_images_per_page':
                     try:
                         value = str(max(1, min(100, int(raw))))

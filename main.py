@@ -127,6 +127,15 @@ def create_app() -> Flask:
             "vary_header": True,
             "max_age": 3600
         },
+        # 管理员 API - 需要 credentials（Session Cookie）
+        r"/api/admin/*": {
+            "origins": admin_origins,
+            "methods": ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "supports_credentials": True,
+            "vary_header": True,
+            "max_age": 3600
+        },
         # 公共 API - 不需要 credentials，允许所有来源
         r"/api/*": {
             "origins": "*",
