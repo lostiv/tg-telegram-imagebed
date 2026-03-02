@@ -21,7 +21,7 @@ const obfuscateToken = (token: string): string => {
     const b64 = btoa(unescape(encodeURIComponent(token)))
     const shifted = b64.split('').map(c => {
       const code = c.charCodeAt(0)
-      // 仅对 ASCII 可打印字符做位移
+      // 仅对 ASCII 可打印字符（33-126）做位移混淆
       if (code >= 33 && code <= 126) {
         return String.fromCharCode(((code - 33 + SHIFT) % 94) + 33)
       }
