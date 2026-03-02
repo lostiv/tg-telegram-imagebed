@@ -131,6 +131,7 @@ import type {
 } from '~/types/admin'
 import type { ImpactData } from '~/components/admin/tokens/TokenBatchActions.vue'
 import type { CreateTokenForm } from '~/components/admin/tokens/TokenCreateModal.vue'
+import { useTokenStore } from '~/stores/token'
 
 definePageMeta({
   layout: 'admin',
@@ -142,6 +143,7 @@ type TokenStatus = 'all' | 'active' | 'disabled' | 'expired'
 const runtimeConfig = useRuntimeConfig()
 const notification = useNotification()
 const route = useRoute()
+const tokenStore = useTokenStore()
 
 // 列表状态
 const status = ref<TokenStatus>('all')
@@ -412,6 +414,14 @@ const createToken = async (form: CreateTokenForm) => {
     createdToken.value = resp.data?.token || null
     tokenCopied.value = false
     notification.success('创建成功', 'Token 已生成，请及时复制保存')
+    
+    // 添加到 Token Vault
+    await tokenStore.addTokenToVault(resp.data?.token, {
+      albumName: form.description || '',
+      makeActive: true,
+      verify: true
+    })
+    
     await refreshAll()
   } catch (error: any) {
     console.error('创建Token失败:', error)
