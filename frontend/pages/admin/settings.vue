@@ -470,31 +470,38 @@
           </div>
         </div>
 
-        <!-- CDN 配置详情 -->
-        <div v-else class="space-y-6">
-          <!-- 基础配置 -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UFormGroup label="Zone ID">
-              <UInput v-model="settings.cloudflare_zone_id" placeholder="Cloudflare Zone ID" />
-            </UFormGroup>
+         <!-- CDN 配置详情 -->
+         <div v-else class="space-y-6">
+           <!-- 基础配置 -->
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <UFormGroup label="CDN 域名">
+               <UInput v-model="settings.cloudflare_cdn_domain" placeholder="cdn.example.com" />
+               <template #hint>
+                 <span class="text-xs text-stone-500">用于访问图片的CDN域名（例如：cdn.example.com）</span>
+               </template>
+             </UFormGroup>
 
-            <UFormGroup label="API Token">
-              <UInput
-                v-model="settings.cloudflare_api_token"
-                type="password"
-                :placeholder="settings.cloudflare_api_token_set ? '已设置（留空保持不变）' : '输入 Cloudflare API Token'"
-              />
-              <template #hint>
-                <span v-if="settings.cloudflare_api_token_set" class="text-xs text-green-600 dark:text-green-400">
-                  已配置 API Token
-                </span>
-                <span v-else class="text-xs text-amber-600 dark:text-amber-400">
-                  未配置 API Token
-                </span>
-              </template>
-            </UFormGroup>
+             <UFormGroup label="Zone ID">
+               <UInput v-model="settings.cloudflare_zone_id" placeholder="Cloudflare Zone ID" />
+             </UFormGroup>
+ 
+             <UFormGroup label="API Token">
+               <UInput
+                 v-model="settings.cloudflare_api_token"
+                 type="password"
+                 :placeholder="settings.cloudflare_api_token_set ? '已设置（留空保持不变）' : '输入 Cloudflare API Token'"
+               />
+               <template #hint>
+                 <span v-if="settings.cloudflare_api_token_set" class="text-xs text-green-600 dark:text-green-400">
+                   已配置 API Token
+                 </span>
+                 <span v-else class="text-xs text-amber-600 dark:text-amber-400">
+                   未配置 API Token
+                 </span>
+               </template>
+             </UFormGroup>
 
-            <UFormGroup label="缓存策略">
+             <UFormGroup label="缓存策略">
               <USelect
                 v-model="settings.cloudflare_cache_level"
                 :options="policyOptions.cloudflare_cache_level"
