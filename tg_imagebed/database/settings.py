@@ -368,6 +368,10 @@ def get_public_settings() -> Dict[str, Any]:
         'tg_auth_required_for_token': settings.get('tg_auth_required_for_token', '0') == '1',
         'tg_bind_token_enabled': settings.get('tg_bind_token_enabled', '0') == '1',
         'tg_sync_delete_enabled': settings.get('tg_sync_delete_enabled', '1') == '1',
+        # 画集站点配置
+        'gallery_site_enabled': settings.get('gallery_site_enabled', '1') == '1',
+        'gallery_site_name': settings.get('gallery_site_name', '画集'),
+        'gallery_site_description': settings.get('gallery_site_description', '精选图片画集'),
         # SEO 配置
         'seo_site_name': settings.get('seo_site_name', ''),
         'seo_site_description': settings.get('seo_site_description', ''),
