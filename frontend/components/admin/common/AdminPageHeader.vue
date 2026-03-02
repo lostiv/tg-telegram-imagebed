@@ -30,7 +30,9 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2 sm:justify-end">
-        <slot name="actions" />
+        <template v-if="$slots.actions">
+          <slot name="actions" />
+        </template>
       </div>
     </div>
   </section>

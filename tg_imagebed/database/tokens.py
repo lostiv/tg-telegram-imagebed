@@ -163,20 +163,28 @@ def _verify_token_core(token: str, *, check_quota: bool = True) -> Dict[str, Any
 
             # 计算剩余上传次数
             upload_count = int(token_data.get('upload_count') or 0)
-            upload_limit = int(token_data.get('upload_limit') or 999999)
-            remaining_uploads = upload_limit - upload_count
+            upload_limit = token_data.get('upload_limit')
+            
+            # 无限上传：upload_limit 为 None 或 0
+            unlimited = upload_limit is None or upload_limit == 0
+            
+            # 计算剩余次数（仅在有限制时）
+            remaining_uploads = None
+            if not unlimited:
+                upload_limit_int = int(upload_limit)
+                remaining_uploads = upload_limit_int - upload_count
 
-            # 配额检查
-            if check_quota and remaining_uploads <= 0:
+            # 配额检查（仅在上传场景且有限制时检查）
+            if check_quota and not unlimited and remaining_uploads <= 0:
                 return {'valid': False, 'reason': f'已达到上传限制({upload_limit}张)'}
 
             result = {
                 'valid': True,
                 'token_data': token_data,
-                'remaining_uploads': max(0, remaining_uploads),
+                'remaining_uploads': max(0, remaining_uploads) if not unlimited else -1,  # -1 表示无限
             }
             if not check_quota:
-                result['can_upload'] = remaining_uploads > 0
+                result['can_upload'] = unlimited or remaining_uploads > 0
             return result
 
     except Exception as e:
@@ -478,16 +486,16 @@ def admin_create_token(
     *,
     description: Optional[str] = None,
     expires_at: Any = None,
-    upload_limit: int = 100,
+    upload_limit: Optional[int] = 100,
     is_active: bool = True
 ) -> Optional[Dict[str, Any]]:
     """
     管理员创建新的 Token。
-
+ 
     Args:
         description: Token 描述
         expires_at: 过期时间（ISO8601 格式或 datetime 对象，None 表示永不过期）
-        upload_limit: 上传限制（0 表示禁止上传，正整数为限制数）
+        upload_limit: 上传限制（0 或 None 表示无限上传，正整数为限制数）
         is_active: 是否启用
 
     Returns:
@@ -497,12 +505,19 @@ def admin_create_token(
     desc_value = (str(description).strip() if description else None) or None
 
     # 验证上传限制
-    try:
-        limit_value = int(upload_limit)
-        if limit_value < 0:
-            raise ValueError("upload_limit 不能为负数")
-    except (TypeError, ValueError) as e:
-        raise ValueError(f"无效的 upload_limit: {upload_limit}") from e
+    limit_value = None
+    if upload_limit is not None:
+        try:
+            val = int(upload_limit)
+            if val < 0:
+                raise ValueError("upload_limit 不能为负数")
+            # 0 表示无限上传，转换为 None
+            if val == 0:
+                limit_value = None
+            else:
+                limit_value = val
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"无效的 upload_limit: {upload_limit}") from e
 
     # 解析过期时间
     expires_value = _parse_datetime(expires_at)
@@ -652,15 +667,21 @@ def admin_update_token(
         params.append(_parse_datetime(expires_at))
 
     if upload_limit is not ...:
-        if upload_limit is None:
-            sets.append("upload_limit = ?")
-            params.append(None)
-        else:
-            val = int(upload_limit)
-            if val < 0:
-                raise ValueError("upload_limit 不能为负数")
-            sets.append("upload_limit = ?")
-            params.append(val)
+        val = None
+        if upload_limit is not None:
+            try:
+                int_val = int(upload_limit)
+                if int_val < 0:
+                    raise ValueError("upload_limit 不能为负数")
+                # 0 表示无限上传，转换为 None
+                if int_val == 0:
+                    val = None
+                else:
+                    val = int_val
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"无效的 upload_limit: {upload_limit}") from e
+        sets.append("upload_limit = ?")
+        params.append(val)
 
     if is_active is not ...:
         sets.append("is_active = ?")

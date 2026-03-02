@@ -16,6 +16,15 @@
       </template>
     </AdminPageHeader>
 
+    <div class="flex justify-end gap-2">
+      <UButton icon="heroicons:arrow-path" color="gray" variant="outline" :loading="loading || metricsLoading" @click="refreshAll">
+        刷新
+      </UButton>
+      <UButton icon="heroicons:plus" color="primary" @click="openCreateModal">
+        创建 Token
+      </UButton>
+    </div>
+
     <AdminTokensTokenStatsBar
       :loading="metricsLoading"
       :metrics="metrics"
