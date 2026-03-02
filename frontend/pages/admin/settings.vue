@@ -2172,7 +2172,7 @@ const loadGallerySiteSettings = async () => {
     if (res?.success && res.data) {
       gallerySiteSettings.value.name = res.data.gallery_site_name || ''
       gallerySiteSettings.value.description = res.data.gallery_site_description || ''
-      gallerySiteSettings.value.enabled = String(res.data.gallery_site_enabled) !== '0'
+      gallerySiteSettings.value.enabled = Boolean(res.data.gallery_site_enabled)
       syncGallerySettingsSnapshot()
     }
   } catch {
