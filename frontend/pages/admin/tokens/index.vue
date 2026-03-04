@@ -402,7 +402,7 @@ const createToken = async (form: CreateTokenForm) => {
     const payload = {
       description: form.description?.trim() || null,
       expires_at: form.expires_at?.trim() || null,
-      upload_limit: form.upload_limit === null || form.upload_limit === undefined || form.upload_limit === '' ? null : Number(form.upload_limit),
+      upload_limit: form.upload_limit === null || form.upload_limit === undefined || form.upload_limit === '' ? 0 : Number(form.upload_limit),
       is_active: Boolean(form.is_active),
     }
     const resp = await $fetch<any>(`${runtimeConfig.public.apiBase}/api/admin/tokens`, {
