@@ -68,10 +68,20 @@ def admin_tokens_api():
             from datetime import datetime, timedelta
             expires_at = (datetime.now() + timedelta(days=default_expires_days)).strftime('%Y-%m-%d %H:%M:%S')
 
+        # 处理 upload_limit：空字符串、NaN、undefined/null 都使用默认值；0 或 '0' 表示无限
+        raw_upload_limit = payload.get('upload_limit')
+        upload_limit = default_upload_limit
+        if raw_upload_limit is not None and raw_upload_limit != '' and str(raw_upload_limit).lower() != 'nan':
+            try:
+                val = int(raw_upload_limit)
+                upload_limit = val if val != 0 else 0
+            except (ValueError, TypeError):
+                upload_limit = default_upload_limit
+
         created = TokenService.create_token(
             description=payload.get('description'),
             expires_at=expires_at,
-            upload_limit=payload.get('upload_limit', default_upload_limit),
+            upload_limit=upload_limit,
             is_active=payload.get('is_active', True),
         )
 
@@ -148,7 +158,14 @@ def admin_token_detail_api(token_id: int):
             update_kwargs['expires_at'] = payload['expires_at']
 
         if 'upload_limit' in payload:
-            update_kwargs['upload_limit'] = payload['upload_limit']
+            raw_limit = payload['upload_limit']
+            if raw_limit is not None and raw_limit != '' and str(raw_limit).lower() != 'nan':
+                try:
+                    update_kwargs['upload_limit'] = int(raw_limit)
+                except (ValueError, TypeError):
+                    update_kwargs['upload_limit'] = None
+            else:
+                update_kwargs['upload_limit'] = None
 
         if not update_kwargs:
             return _admin_json({'success': False, 'error': '未提供任何更新字段'}, 400)
