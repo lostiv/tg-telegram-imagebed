@@ -203,24 +203,14 @@ def storage_upload_policy():
         return _admin_json({'success': False, 'error': '存储策略操作失败'}, 500)
 
 
-@admin_bp.route('/api/admin/upload', methods=['POST', 'OPTIONS'])
-@admin_module.login_required
-def admin_upload():
-    """Admin upload endpoint with optional backend selection."""
-    if request.method == 'OPTIONS':
-        return _admin_options('POST, OPTIONS')
-
-    if 'file' not in request.files:
-        return _admin_json({'success': False, 'error': 'Missing file'}, 400)
-
-    f = request.files['file']
+def _process_single_admin_file(f, backend: str):
+    """处理单个管理员上传文件，返回 (data_dict, error_tuple)。"""
     if not f.filename:
-        return _admin_json({'success': False, 'error': 'Missing file'}, 400)
+        return None, (_admin_json({'success': False, 'error': 'Missing file'}, 400),)
 
-    backend = (request.form.get('backend') or '').strip()
     err, validated = validate_upload_file(f)
     if err:
-        return err
+        return None, (err,)
 
     try:
         result = process_upload(
@@ -234,25 +224,62 @@ def admin_upload():
             staged_file_path=validated.temp_path,
         )
     except ValueError as e:
-        return _admin_json({'success': False, 'error': str(e)}, 400)
+        return None, (_admin_json({'success': False, 'error': str(e)}, 400),)
     finally:
         if validated:
             validated.cleanup()
 
     if not result:
-        return _admin_json({'success': False, 'error': 'Upload failed'}, 500)
+        return None, (_admin_json({'success': False, 'error': 'Upload failed'}, 500),)
 
     base_url = get_image_domain(request, scene='admin')
     url = f"{base_url}/image/{result['encrypted_id']}"
 
+    return {
+        'url': url,
+        'encrypted_id': result['encrypted_id'],
+        'filename': f.filename,
+        'size': format_size(result['file_size']),
+    }, None
+
+
+@admin_bp.route('/api/admin/upload', methods=['POST', 'OPTIONS'])
+@admin_module.login_required
+def admin_upload():
+    """Admin upload endpoint with optional backend selection (single or batch)."""
+    if request.method == 'OPTIONS':
+        return _admin_options('POST, OPTIONS')
+
+    files = request.files.getlist('file')
+    if not files:
+        return _admin_json({'success': False, 'error': 'Missing file'}, 400)
+
+    backend = (request.form.get('backend') or '').strip()
+
+    uploaded = []
+    errors = []
+
+    for f in files:
+        data, err = _process_single_admin_file(f, backend=backend)
+        if err:
+            errors.append(err)
+            continue
+        uploaded.append(data)
+
+    if not uploaded:
+        return errors[0] if errors else _admin_json({'success': False, 'error': 'Upload failed'}, 500)
+
+    if len(uploaded) == 1 and not errors:
+        return _admin_json({'success': True, 'data': uploaded[0]})
+
     return _admin_json({
         'success': True,
         'data': {
-            'url': url,
-            'encrypted_id': result['encrypted_id'],
-            'filename': f.filename,
-            'size': format_size(result['file_size']),
-        }
+            'files': uploaded,
+            'total': len(uploaded) + len(errors),
+            'succeeded': len(uploaded),
+            'failed': len(errors),
+        },
     })
 @admin_bp.route('/api/admin/storage/config', methods=['GET', 'OPTIONS'])
 @admin_module.login_required

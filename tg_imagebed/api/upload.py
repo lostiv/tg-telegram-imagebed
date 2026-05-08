@@ -156,38 +156,25 @@ def validate_upload_file(file) -> Tuple[Optional[tuple], Optional[ValidatedUploa
     )
 
 
-@upload_bp.route("/api/upload", methods=["POST"])
-@upload_bp.route("/upload", methods=["POST"])
-def upload_file():
-    """Handle anonymous uploads from the web UI."""
-    if not is_guest_upload_allowed():
-        return add_cache_headers(jsonify({
-            "success": False,
-            "error": "匿名上传已关闭，请使用 Token 上传或联系管理员",
-        }), "no-cache"), 403
-
-    if "file" not in request.files:
-        return add_cache_headers(jsonify({"error": "No file provided"}), "no-cache"), 400
-
-    file = request.files["file"]
+def _process_single_file(file, source: str, daily_limit: int):
+    """处理单个文件上传，返回 (data_dict, error_tuple)。"""
     if file.filename == "":
-        return add_cache_headers(jsonify({"error": "No file selected"}), "no-cache"), 400
+        return None, (jsonify({"error": "No file selected"}), 400)
 
     err, validated = validate_upload_file(file)
     if err:
-        return err
+        return None, err
 
-    daily_limit = get_system_setting_int("daily_upload_limit", 0, minimum=0, maximum=1000000)
     reservation_key = None
-
     try:
         if daily_limit > 0:
-            reservation = reserve_guest_upload(source="web_upload", daily_limit=daily_limit)
+            reservation = reserve_guest_upload(source=source, daily_limit=daily_limit)
             if not reservation.get("ok"):
-                return add_cache_headers(jsonify({
+                return None, (jsonify({
                     "success": False,
                     "error": reservation.get("reason", "上传受限"),
-                }), "no-cache"), reservation.get("status", 429)
+                }), reservation.get("status", 429))
+
             reservation_key = reservation.get("reservation_key")
 
         result = process_upload(
@@ -195,7 +182,7 @@ def upload_file():
             filename=file.filename,
             content_type=validated.detected_mime,
             username="web_user",
-            source="web_upload",
+            source=source,
             staged_file_path=validated.temp_path,
             reservation_key=reservation_key,
         )
@@ -203,27 +190,69 @@ def upload_file():
         if not result:
             if reservation_key:
                 release_upload_reservation(reservation_key)
-            return add_cache_headers(jsonify({"error": "Failed to upload to storage"}), "no-cache"), 500
+            return None, (jsonify({"error": "Failed to upload to storage"}), 500)
 
         base_url = get_image_domain(request, scene="guest")
         permanent_url = f"{base_url}/image/{result['encrypted_id']}"
 
         logger.info("Web upload complete: %s -> %s", file.filename, result["encrypted_id"])
-        return add_cache_headers(jsonify({
-            "success": True,
-            "data": {
-                "url": permanent_url,
-                "filename": file.filename,
-                "size": format_size(result["file_size"]),
-                "upload_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            },
-        }), "no-cache")
+        return {
+            "url": permanent_url,
+            "filename": file.filename,
+            "size": format_size(result["file_size"]),
+            "upload_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }, None
 
     except Exception as e:
         if reservation_key:
             release_upload_reservation(reservation_key)
         logger.error(f"Upload error: {e}")
-        return add_cache_headers(jsonify({"error": "上传失败，请稍后重试"}), "no-cache"), 500
+        return None, (jsonify({"error": "上传失败，请稍后重试"}), 500)
     finally:
         if validated:
             validated.cleanup()
+
+
+@upload_bp.route("/api/upload", methods=["POST"])
+@upload_bp.route("/upload", methods=["POST"])
+def upload_file():
+    """Handle anonymous uploads from the web UI (single or batch)."""
+    if not is_guest_upload_allowed():
+        return add_cache_headers(jsonify({
+            "success": False,
+            "error": "匿名上传已关闭，请使用 Token 上传或联系管理员",
+        }), "no-cache"), 403
+
+    files = request.files.getlist("file")
+    if not files:
+        return add_cache_headers(jsonify({"error": "No file provided"}), "no-cache"), 400
+
+    daily_limit = get_system_setting_int("daily_upload_limit", 0, minimum=0, maximum=1000000)
+
+    uploaded = []
+    errors = []
+
+    for f in files:
+        data, err = _process_single_file(f, source="web_upload", daily_limit=daily_limit)
+        if err:
+            errors.append(err)
+            break
+        uploaded.append(data)
+
+    if not uploaded:
+        return errors[0] if errors else (
+            add_cache_headers(jsonify({"error": "Upload failed"}), "no-cache"), 500
+        )
+
+    if len(uploaded) == 1 and not errors:
+        return add_cache_headers(jsonify({"success": True, "data": uploaded[0]}), "no-cache")
+
+    return add_cache_headers(jsonify({
+        "success": True,
+        "data": {
+            "files": uploaded,
+            "total": len(uploaded) + len(errors),
+            "succeeded": len(uploaded),
+            "failed": len(errors),
+        },
+    }), "no-cache")

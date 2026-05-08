@@ -199,9 +199,68 @@ def verify_token_api():
         logger.error(f"验证token失败: {e}")
         return add_cache_headers(jsonify({'success': False, 'valid': False, 'error': '验证失败，请稍后重试'}), 'no-cache'), 500
 
+def _process_single_auth_file(file, token: str, source: str, daily_limit: int):
+    """处理单个 Token 上传文件，返回 (data_dict, error_tuple)。"""
+    if file.filename == '':
+        return None, (jsonify({'success': False, 'error': 'Missing file'}), 400)
+
+    err, validated = validate_upload_file(file)
+    if err:
+        return None, err
+
+    reservation_key = None
+    try:
+        reservation = reserve_token_upload(token, daily_limit=daily_limit)
+        if not reservation.get('ok'):
+            return None, (jsonify({
+                'success': False,
+                'error': reservation.get('reason', 'Upload blocked'),
+            }), reservation.get('status', 429))
+
+        reservation_key = reservation.get('reservation_key')
+        remaining = reservation.get('remaining_uploads', 0)
+
+        result = process_upload(
+            file_content=None,
+            filename=file.filename,
+            content_type=validated.detected_mime,
+            username='guest_user',
+            source=source,
+            auth_token=token,
+            staged_file_path=validated.temp_path,
+            reservation_key=reservation_key,
+        )
+
+        if not result:
+            if reservation_key:
+                release_upload_reservation(reservation_key)
+            return None, (jsonify({'success': False, 'error': 'Failed to upload to storage backend'}), 500)
+
+        base_url = get_image_domain(request, scene='token')
+        permanent_url = f"{base_url}/image/{result['encrypted_id']}"
+
+        logger.info(f"Token upload complete: {file.filename} -> {result['encrypted_id']}, remaining={remaining}")
+        return {
+            'url': permanent_url,
+            'filename': file.filename,
+            'size': format_size(result['file_size']),
+            'upload_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'remaining_uploads': remaining,
+        }, None
+
+    except Exception as e:
+        if reservation_key:
+            release_upload_reservation(reservation_key)
+        logger.error(f"Token upload failed: {e}")
+        return None, (jsonify({'success': False, 'error': 'Upload failed, please try again later'}), 500)
+    finally:
+        if validated:
+            validated.cleanup()
+
+
 @auth_bp.route('/api/auth/upload', methods=['POST'])
 def upload_with_token():
-    """Upload an image with a token."""
+    """Upload images with a token (single or batch)."""
     if not is_token_upload_allowed():
         return add_cache_headers(jsonify({
             'success': False,
@@ -225,70 +284,39 @@ def upload_with_token():
     if issue:
         return add_cache_headers(jsonify({'success': False, 'error': issue['reason']}), 'no-cache'), issue['status']
 
-    if 'file' not in request.files:
+    files = request.files.getlist('file')
+    if not files:
         return add_cache_headers(jsonify({'success': False, 'error': 'Missing file'}), 'no-cache'), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return add_cache_headers(jsonify({'success': False, 'error': 'Missing file'}), 'no-cache'), 400
-
-    err, validated = validate_upload_file(file)
-    if err:
-        return err
 
     daily_limit = get_system_setting_int('daily_upload_limit', 0, minimum=0, maximum=1000000)
-    reservation_key = None
 
-    try:
-        reservation = reserve_token_upload(token, daily_limit=daily_limit)
-        if not reservation.get('ok'):
-            return add_cache_headers(jsonify({
-                'success': False,
-                'error': reservation.get('reason', 'Upload blocked'),
-            }), 'no-cache'), reservation.get('status', 429)
+    uploaded = []
+    errors = []
 
-        reservation_key = reservation.get('reservation_key')
-        remaining = reservation.get('remaining_uploads', 0)
+    for f in files:
+        data, err = _process_single_auth_file(f, token=token, source='guest_token', daily_limit=daily_limit)
+        if err:
+            errors.append(err)
+            break
+        uploaded.append(data)
 
-        result = process_upload(
-            file_content=None,
-            filename=file.filename,
-            content_type=validated.detected_mime,
-            username='guest_user',
-            source='guest_token',
-            auth_token=token,
-            staged_file_path=validated.temp_path,
-            reservation_key=reservation_key,
+    if not uploaded:
+        return errors[0] if errors else (
+            add_cache_headers(jsonify({'success': False, 'error': 'Upload failed'}), 'no-cache'), 500
         )
 
-        if not result:
-            if reservation_key:
-                release_upload_reservation(reservation_key)
-            return add_cache_headers(jsonify({'success': False, 'error': 'Failed to upload to storage backend'}), 'no-cache'), 500
+    if len(uploaded) == 1 and not errors:
+        return add_cache_headers(jsonify({"success": True, "data": uploaded[0]}), "no-cache")
 
-        base_url = get_image_domain(request, scene='token')
-        permanent_url = f"{base_url}/image/{result['encrypted_id']}"
-
-        logger.info(f"Token upload complete: {file.filename} -> {result['encrypted_id']}, remaining={remaining}")
-        return add_cache_headers(jsonify({
-            'success': True,
-            'data': {
-                'url': permanent_url,
-                'filename': file.filename,
-                'size': format_size(result['file_size']),
-                'upload_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'remaining_uploads': remaining,
-            }
-        }), 'no-cache')
-
-    except Exception as e:
-        if reservation_key:
-            release_upload_reservation(reservation_key)
-        logger.error(f"Token upload failed: {e}")
-        return add_cache_headers(jsonify({'success': False, 'error': 'Upload failed, please try again later'}), 'no-cache'), 500
-    finally:
-        if validated:
-            validated.cleanup()
+    return add_cache_headers(jsonify({
+        'success': True,
+        'data': {
+            'files': uploaded,
+            'total': len(uploaded) + len(errors),
+            'succeeded': len(uploaded),
+            'failed': len(errors),
+        },
+    }), 'no-cache')
 @auth_bp.route('/api/auth/uploads', methods=['GET'])
 def get_token_uploads_api():
     """获取 Token 上传的图片列表"""
