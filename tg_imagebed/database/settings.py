@@ -73,7 +73,7 @@ def update_announcement(enabled: bool, content: str) -> int:
 SENSITIVE_SETTINGS = {
     'storage_config_json', 'storage_upload_policy_json',
     'cloudflare_api_token', 'telegram_bot_token', 'proxy_url',
-    'domain_upload_policy_json',
+    'domain_upload_policy_json', 'totp_secret',
 }
 
 # 默认系统设置
@@ -175,6 +175,9 @@ DEFAULT_SYSTEM_SETTINGS = {
     'image_domain_restriction_enabled': '0',  # 图片域名限制开关
     # 域名场景路由策略
     'domain_upload_policy_json': '',           # 上传场景→图片域名映射（JSON）
+    # TOTP 二次验证配置
+    'totp_enabled': '0',                       # TOTP 是否启用
+    'totp_secret': '',                         # TOTP 密钥（敏感）
     # 画集站点配置
     'gallery_site_name': '画集',               # 画集站点名称
     'gallery_site_description': '精选图片画集', # 画集站点描述
@@ -443,3 +446,35 @@ def disable_all_tokens() -> int:
     except Exception as e:
         logger.error(f"禁用所有 Token 失败: {e}")
         return 0
+
+
+# ===================== TOTP 二次验证 =====================
+
+def is_totp_enabled() -> bool:
+    """检查 TOTP 二次验证是否已启用"""
+    return get_system_setting('totp_enabled') == '1'
+
+
+def get_totp_secret() -> str:
+    """获取 TOTP 密钥"""
+    return get_system_setting('totp_secret') or ''
+
+
+def enable_totp(secret: str) -> bool:
+    """启用 TOTP 二次验证并存储密钥"""
+    normalized_secret = secret.strip()
+    if not normalized_secret:
+        logger.warning("启用 TOTP 失败: 密钥为空")
+        return False
+    return update_system_settings({
+        'totp_secret': normalized_secret,
+        'totp_enabled': '1',
+    })
+
+
+def disable_totp() -> bool:
+    """禁用 TOTP 二次验证并清除密钥"""
+    return update_system_settings({
+        'totp_secret': '',
+        'totp_enabled': '0',
+    })
