@@ -241,9 +241,11 @@ class TelegramBackend(StorageBackend):
         caption: str,
     ) -> Optional[PutResult]:
         """沿用现有 Bot API 上传逻辑"""
-        # Telegram 对 sendPhoto 有 10MB 限制，超过使用 sendDocument
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
-            files = {'photo': (filename, file_content, content_type)}
+        # 请求体来源：优先使用文件句柄（流式），否则使用 bytes
+        upload_payload = file_handle if file_handle is not None else file_content
+        # sendPhoto 仅用于 JPEG (不增加额外损失), 其余格式走 sendDocument 保留原始文件
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
+            files = {'photo': (filename, upload_payload, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendPhoto",
@@ -252,7 +254,7 @@ class TelegramBackend(StorageBackend):
                 timeout=60,
             )
         else:
-            files = {'document': (filename, file_content, content_type)}
+            files = {'document': (filename, upload_payload, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendDocument",
@@ -262,7 +264,7 @@ class TelegramBackend(StorageBackend):
             )
 
         if not resp.ok:
-            logger.error(f"Telegram 上传失败: HTTP {resp.status_code}")
+            logger.error(f"Telegram 上传失败: HTTP {resp.status_code}, body: {resp.text[:500]}")
             return None
 
         payload = resp.json() or {}
@@ -272,7 +274,7 @@ class TelegramBackend(StorageBackend):
 
         result = payload.get('result') or {}
 
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
             photos = result.get('photo') or []
             if not photos:
                 logger.error("Telegram 上传失败: 无法获取 photo")
@@ -283,7 +285,10 @@ class TelegramBackend(StorageBackend):
             file_id = doc.get('file_id')
 
         if not file_id:
-            logger.error("Telegram 上传失败: 无法获取 file_id")
+            logger.error(
+                f"Telegram 上传失败: 无法获取 file_id, "
+                f"response keys: {list(result.keys()) if result else 'None'}"
+            )
             return None
 
         file_path = self._get_file_path(file_id) or ''
