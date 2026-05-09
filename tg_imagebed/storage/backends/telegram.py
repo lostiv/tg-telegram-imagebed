@@ -264,7 +264,7 @@ class TelegramBackend(StorageBackend):
             )
 
         if not resp.ok:
-            logger.error(f"Telegram 上传失败: HTTP {resp.status_code}")
+            logger.error(f"Telegram 上传失败: HTTP {resp.status_code}, body: {resp.text[:500]}")
             return None
 
         payload = resp.json() or {}
@@ -285,7 +285,10 @@ class TelegramBackend(StorageBackend):
             file_id = doc.get('file_id')
 
         if not file_id:
-            logger.error("Telegram 上传失败: 无法获取 file_id")
+            logger.error(
+                f"Telegram 上传失败: 无法获取 file_id, "
+                f"response keys: {list(result.keys()) if result else 'None'}"
+            )
             return None
 
         file_path = self._get_file_path(file_id) or ''
