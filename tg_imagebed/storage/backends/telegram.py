@@ -242,10 +242,10 @@ class TelegramBackend(StorageBackend):
     ) -> Optional[PutResult]:
         """沿用现有 Bot API 上传逻辑"""
         # 请求体来源：优先使用文件句柄（流式），否则使用 bytes
-        upload_payload = file_handle if file_handle is not None else file_content
-        # sendPhoto 仅用于 JPEG (不增加额外损失), 其余格式走 sendDocument 保留原始文件
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
-            files = {'photo': (filename, upload_payload, content_type)}
+        file_body = file_handle if file_handle is not None else file_content
+        # Telegram 对 sendPhoto 有 10MB 限制，超过使用 sendDocument
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+            files = {'photo': (filename, file_body, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendPhoto",
@@ -254,7 +254,7 @@ class TelegramBackend(StorageBackend):
                 timeout=60,
             )
         else:
-            files = {'document': (filename, upload_payload, content_type)}
+            files = {'document': (filename, file_body, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendDocument",
@@ -311,7 +311,8 @@ class TelegramBackend(StorageBackend):
     def _upload_via_kurigram(
         self,
         *,
-        file_content: bytes,
+        file_content: Optional[bytes] = None,
+        file_path: Optional[str] = None,
         filename: str,
         file_size: int,
         caption: str,
@@ -320,13 +321,18 @@ class TelegramBackend(StorageBackend):
 
         async def task():
             app = self._build_kurigram_client()
-            payload = io.BytesIO(file_content)
-            payload.name = filename or "upload.bin"
+            # 文件来源：优先使用本地文件路径（Pyrogram 支持流式读取），否则用 bytes
+            if file_path:
+                document = file_path
+            else:
+                payload = io.BytesIO(file_content or b'')
+                payload.name = filename or "upload.bin"
+                document = payload
 
             async with app:
                 message = await app.send_document(
                     chat_id=self._chat_id,
-                    document=payload,
+                    document=document,
                     file_name=filename or None,
                     caption=caption or "",
                 )
