@@ -274,7 +274,7 @@ class TelegramBackend(StorageBackend):
 
         result = payload.get('result') or {}
 
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
             photos = result.get('photo') or []
             if not photos:
                 logger.error("Telegram 上传失败: 无法获取 photo")
