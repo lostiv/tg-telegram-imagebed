@@ -462,11 +462,19 @@ def get_totp_secret() -> str:
 
 def enable_totp(secret: str) -> bool:
     """启用 TOTP 二次验证并存储密钥"""
-    update_system_setting('totp_secret', secret)
-    return update_system_setting('totp_enabled', '1')
+    normalized_secret = secret.strip()
+    if not normalized_secret:
+        logger.warning("启用 TOTP 失败: 密钥为空")
+        return False
+    return update_system_settings({
+        'totp_secret': normalized_secret,
+        'totp_enabled': '1',
+    })
 
 
 def disable_totp() -> bool:
     """禁用 TOTP 二次验证并清除密钥"""
-    update_system_setting('totp_secret', '')
-    return update_system_setting('totp_enabled', '0')
+    return update_system_settings({
+        'totp_secret': '',
+        'totp_enabled': '0',
+    })
