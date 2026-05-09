@@ -243,8 +243,8 @@ class TelegramBackend(StorageBackend):
         """沿用现有 Bot API 上传逻辑"""
         # 请求体来源：优先使用文件句柄（流式），否则使用 bytes
         file_body = file_handle if file_handle is not None else file_content
-        # Telegram 对 sendPhoto 有 10MB 限制，超过使用 sendDocument
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+        # sendPhoto 仅用于 JPEG (不增加额外损失), 其余格式走 sendDocument 保留原始文件
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
             files = {'photo': (filename, file_body, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
