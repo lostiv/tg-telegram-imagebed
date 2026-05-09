@@ -1,5 +1,5 @@
 <template>
-  <UCard class="border border-stone-200/80 bg-white/92 shadow-sm dark:border-neutral-700/80 dark:bg-neutral-900/88">
+  <UCard class="border border-stone-200/80 shadow-sm dark:border-neutral-700/80">
     <div class="space-y-3">
       <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
         <div class="flex min-w-0 flex-1 items-center gap-2">

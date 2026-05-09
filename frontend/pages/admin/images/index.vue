@@ -49,7 +49,7 @@
       />
     </div>
 
-    <UCard class="border border-stone-200/80 bg-white/92 shadow-sm dark:border-neutral-700/80 dark:bg-neutral-900/88">
+    <UCard class="border border-stone-200/80 shadow-sm dark:border-neutral-700/80">
       <div v-if="loading" class="flex flex-col items-center justify-center py-20">
         <div class="h-14 w-14 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
         <p class="mt-3 text-sm text-stone-500 dark:text-stone-400">加载中...</p>
