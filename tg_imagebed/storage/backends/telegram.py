@@ -241,8 +241,8 @@ class TelegramBackend(StorageBackend):
         caption: str,
     ) -> Optional[PutResult]:
         """沿用现有 Bot API 上传逻辑"""
-        # Telegram 对 sendPhoto 有 10MB 限制，超过使用 sendDocument
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+        # sendPhoto 仅用于 JPEG（不增加额外损失），其余格式走 sendDocument 保留原始文件
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
             files = {'photo': (filename, file_content, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
@@ -272,7 +272,7 @@ class TelegramBackend(StorageBackend):
 
         result = payload.get('result') or {}
 
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
+        if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
             photos = result.get('photo') or []
             if not photos:
                 logger.error("Telegram 上传失败: 无法获取 photo")
