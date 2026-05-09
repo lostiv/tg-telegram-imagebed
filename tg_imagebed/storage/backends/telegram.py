@@ -241,9 +241,10 @@ class TelegramBackend(StorageBackend):
         caption: str,
     ) -> Optional[PutResult]:
         """沿用现有 Bot API 上传逻辑"""
-        # sendPhoto 仅用于 JPEG（不增加额外损失），其余格式走 sendDocument 保留原始文件
+        # sendPhoto 仅用于 JPEG (不增加额外损失), 其余格式走 sendDocument 保留原始文件
+        upload_payload = file_handle if file_handle is not None else file_content
         if file_size <= _BOT_API_PHOTO_LIMIT and content_type == 'image/jpeg':
-            files = {'photo': (filename, file_content, content_type)}
+            files = {'photo': (filename, upload_payload, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendPhoto",
@@ -252,7 +253,7 @@ class TelegramBackend(StorageBackend):
                 timeout=60,
             )
         else:
-            files = {'document': (filename, file_content, content_type)}
+            files = {'document': (filename, upload_payload, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
             resp = self._session.post(
                 f"https://api.telegram.org/bot{self._bot_token}/sendDocument",
