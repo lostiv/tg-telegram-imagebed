@@ -17,7 +17,6 @@ import threading
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -117,6 +116,15 @@ def create_app() -> Flask:
         },
         # Token 生成 API - 需要 credentials（TG 绑定时读取 tg_session cookie）
         r"/api/auth/token/generate": {
+            "origins": admin_origins,
+            "methods": ["POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "supports_credentials": True,
+            "vary_header": True,
+            "max_age": 3600
+        },
+        # Token 上传 API - 已绑定 TG 的 Token 需要携带 tg_session cookie
+        r"/api/auth/upload": {
             "origins": admin_origins,
             "methods": ["POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],

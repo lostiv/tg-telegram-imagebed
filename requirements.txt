@@ -1,14 +1,15 @@
 # Telegram Bot
 python-telegram-bot==21.0.1
-Kurigram==2.2.19
-TgCrypto==1.2.5
+Kurigram==2.2.23
+TgCrypto==1.2.5; python_version < "3.13"
+tgcrypto-pyrofork==1.2.8; python_version >= "3.13"
 
 # Web Framework
 Flask==3.0.0
 flask-cors==4.0.0
 
 # HTTP Client
-aiohttp==3.9.3
+aiohttp==3.13.5
 requests==2.31.0
 
 # TOTP 二次验证

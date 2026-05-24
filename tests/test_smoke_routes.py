@@ -170,6 +170,20 @@ class SmokeRouteTests(unittest.TestCase):
         self.assertEqual(image_response.status_code, 200)
         self.assertEqual(image_response.data, PNG_BYTES)
 
+    def test_token_upload_cors_allows_bound_token_cookie(self):
+        response = self.client.options(
+            "/api/auth/upload",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Authorization, Content-Type",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Access-Control-Allow-Credentials"), "true")
+        self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "http://localhost:3000")
+
     def test_token_upload_limit_exhaustion_returns_429(self):
         token_response = self.client.post(
             "/api/auth/token/generate",
@@ -205,6 +219,45 @@ class SmokeRouteTests(unittest.TestCase):
         image_response = self.client.get(f"/image/{encrypted_id}")
         self.assertEqual(image_response.status_code, 200)
         self.assertEqual(image_response.data, PNG_BYTES)
+
+    def test_head_image_does_not_download_backend_body(self):
+        upload_response = self._upload_png("/api/upload")
+        self.assertEqual(upload_response.status_code, 200)
+        encrypted_id = upload_response.get_json()["data"]["url"].rsplit("/", 1)[-1]
+
+        with patch.object(self.router, "get_backend_for_record") as get_backend:
+            response = self.client.head(f"/image/{encrypted_id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Length"), str(len(PNG_BYTES)))
+        self.assertEqual(response.data, b"")
+        get_backend.assert_not_called()
+
+    def test_delete_referenced_storage_backend_is_blocked(self):
+        upload_response = self._upload_png("/api/upload")
+        self.assertEqual(upload_response.status_code, 200)
+
+        storage_config = {
+            "active": "telegram",
+            "backends": {
+                "telegram": {"driver": "telegram", "chat_id": "1"},
+                "fake": {"driver": "local", "root_dir": str(Path(self.temp_dir.name) / "fake")},
+            },
+        }
+        update_system_setting("storage_config_json", __import__("json").dumps(storage_config))
+
+        with self.client.session_transaction() as session:
+            session["admin_logged_in"] = True
+            session["admin_username"] = "admin"
+            session["admin_token"] = "admin-smoke-token"
+
+        response = self.client.delete("/api/admin/storage/backends/fake")
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload["success"])
+        self.assertIn("仍有", payload["error"])
+
 
     def test_admin_images_guest_filter_includes_web_upload_source(self):
         upload_response = self._upload_png("/api/upload")

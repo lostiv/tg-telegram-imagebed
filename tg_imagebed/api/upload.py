@@ -69,11 +69,16 @@ def validate_image_magic(content: bytes) -> Optional[str]:
         major_brand = content[8:12]
         if major_brand in (b"avif", b"avis"):
             return "image/avif"
+        if major_brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+            return "image/heic"
         # 检查 compatible brands 区域
-        compat_region = content[16:min(32, len(content))]
+        compat_region = content[16:min(64, len(content))]
         for i in range(0, len(compat_region) - 3, 4):
-            if compat_region[i:i + 4] in (b"avif", b"avis"):
+            brand = compat_region[i:i + 4]
+            if brand in (b"avif", b"avis"):
                 return "image/avif"
+            if brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+                return "image/heic"
 
     return None
 

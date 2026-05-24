@@ -27,6 +27,8 @@ from tg_imagebed.database import (
     create_tg_session,
     count_tokens_by_ip,
 )
+from tg_imagebed.api.upload import validate_image_magic
+from tg_imagebed.services.token_service import TokenService
 
 
 class UploadLimitTests(unittest.TestCase):
@@ -170,6 +172,67 @@ class UploadLimitTests(unittest.TestCase):
         self.assertEqual(token_info["token"], "sync-unlimited-token")
         self.assertEqual(token_info["remaining_uploads"], -1)
         self.assertTrue(token_info["can_upload"])
+
+    def test_validate_image_magic_accepts_heic_ftyp_brands(self):
+        heic_header = (
+            b"\x00\x00\x00\x18"
+            b"ftyp"
+            b"heic"
+            b"\x00\x00\x00\x00"
+            b"mif1"
+            b"heic"
+        )
+
+        self.assertEqual(validate_image_magic(heic_header), "image/heic")
+
+    def test_delete_token_with_images_succeeds_when_external_cleanup_fails(self):
+        token = create_auth_token(
+            ip_address="127.0.0.1",
+            user_agent="test-agent",
+            description="cleanup-failure",
+            upload_limit=3,
+            expires_days=7,
+        )
+        self.assertIsNotNone(token)
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO file_storage (
+                    encrypted_id, file_id, file_path, upload_time,
+                    file_size, source, original_filename, mime_type,
+                    auth_token, storage_backend, storage_key, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    "cleanup-test-id",
+                    "file-id",
+                    "file-path",
+                    1234567890,
+                    12,
+                    "token",
+                    "pixel.png",
+                    "image/png",
+                    token,
+                    "missing-backend",
+                    "missing-key",
+                ),
+            )
+
+        with patch.object(
+            TokenService,
+            "_delete_external_files",
+            side_effect=RuntimeError("router unavailable"),
+        ):
+            self.assertTrue(TokenService.delete_token_by_string(token, delete_images=True))
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM auth_tokens WHERE token = ?", (token,))
+            self.assertEqual(cursor.fetchone()[0], 0)
+            cursor.execute("SELECT COUNT(*) FROM file_storage WHERE encrypted_id = ?", ("cleanup-test-id",))
+            self.assertEqual(cursor.fetchone()[0], 0)
 
 
 if __name__ == "__main__":

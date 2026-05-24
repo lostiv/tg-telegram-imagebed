@@ -37,27 +37,56 @@ class TokenService:
 
     # ── 删除关联图片（内部辅助） ────────────────────────────
     @staticmethod
-    def _delete_images_for_token_str(token_str: str, cursor) -> Dict[str, int]:
-        """
-        删除指定 token 关联的所有图片（存储后端 + 数据库记录 + TG消息同步删除）。
-        在已有事务的 cursor 上操作，不自行管理连接。
-
-        Returns:
-            { "images_deleted": int, "tg_deleted": int }
-        """
-        import requests as http_requests
-
-        result = {"images_deleted": 0, "tg_deleted": 0}
-
-        # 查询该 token 关联的所有图片
+    def _collect_image_rows_for_token_str(token_str: str, cursor) -> List[Dict[str, Any]]:
+        """查询指定 token 关联的图片行。"""
         cursor.execute(
             "SELECT encrypted_id, file_size, storage_backend, storage_key, "
             "group_chat_id, group_message_id, storage_meta "
             "FROM file_storage WHERE auth_token = ?",
             (token_str,),
         )
-        files = cursor.fetchall()
-        if not files:
+        return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def _delete_image_records_for_token_str(
+        token_str: str,
+        cursor,
+        image_rows: List[Dict[str, Any]],
+    ) -> Dict[str, int]:
+        """仅删除数据库记录并修正 token 计数，不执行外部 I/O。"""
+        result = {"images_deleted": 0, "tg_deleted": 0}
+        encrypted_ids = [row["encrypted_id"] for row in image_rows if row.get("encrypted_id")]
+        if not encrypted_ids:
+            return result
+
+        def _chunked(seq, size=900):
+            for i in range(0, len(seq), size):
+                yield seq[i:i + size]
+
+        for chunk in _chunked(encrypted_ids):
+            placeholders = ','.join('?' * len(chunk))
+            cursor.execute(
+                f"DELETE FROM file_storage WHERE encrypted_id IN ({placeholders})",
+                chunk,
+            )
+            result["images_deleted"] += cursor.rowcount
+
+        if result["images_deleted"] > 0:
+            cursor.execute(
+                "UPDATE auth_tokens SET upload_count = MAX(0, upload_count - ?) WHERE token = ?",
+                (result["images_deleted"], token_str),
+            )
+
+        return result
+
+    @staticmethod
+    def _delete_external_files(image_rows: List[Dict[str, Any]]) -> Dict[str, int]:
+        """删除存储后端文件和 Telegram 消息。应在数据库事务外调用。"""
+        import json as _json
+        import requests as http_requests
+
+        result = {"tg_deleted": 0}
+        if not image_rows:
             return result
 
         # 检查是否启用 TG 同步删除
@@ -77,15 +106,11 @@ class TokenService:
                 pass
 
         tg_seen = set()
-        encrypted_ids = []
 
-        for row in files:
-            file_row = dict(row)
+        for file_row in image_rows:
             encrypted_id = file_row['encrypted_id']
             storage_backend = (file_row.get('storage_backend') or 'telegram').strip()
             storage_key = file_row.get('storage_key') or ''
-
-            encrypted_ids.append(encrypted_id)
 
             # 删除存储后端文件（静默忽略失败）
             if storage_key:
@@ -103,7 +128,6 @@ class TokenService:
                 # 兼容历史数据：从 storage_meta 中提取 message_id，从后端配置获取 chat_id
                 if not message_id or not chat_id:
                     try:
-                        import json as _json
                         meta_raw = file_row.get('storage_meta')
                         meta = {}
                         if isinstance(meta_raw, str) and meta_raw.strip():
@@ -139,25 +163,26 @@ class TokenService:
                         except Exception:
                             pass
 
-        # 批量删除数据库记录（分块处理）
-        def _chunked(seq, size=900):
-            for i in range(0, len(seq), size):
-                yield seq[i:i + size]
+        return result
 
-        for chunk in _chunked(encrypted_ids):
-            placeholders = ','.join('?' * len(chunk))
-            cursor.execute(
-                f"DELETE FROM file_storage WHERE encrypted_id IN ({placeholders})",
-                chunk,
-            )
-            result["images_deleted"] += cursor.rowcount
+    @staticmethod
+    def _try_delete_external_files(image_rows: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Best-effort external cleanup after database changes have committed."""
+        try:
+            return TokenService._delete_external_files(image_rows)
+        except Exception as e:
+            logger.warning(f"Token 关联图片外部清理失败，数据库删除已完成: {e}")
+            return {"tg_deleted": 0}
 
-        # 递减 token 的 upload_count（不低于 0）
-        if result["images_deleted"] > 0:
-            cursor.execute(
-                "UPDATE auth_tokens SET upload_count = MAX(0, upload_count - ?) WHERE token = ?",
-                (result["images_deleted"], token_str),
-            )
+    @staticmethod
+    def _delete_images_for_token_str(token_str: str, cursor) -> Dict[str, int]:
+        """
+        删除指定 token 关联的数据库图片记录。
+
+        兼容旧调用；外部存储清理应在事务提交后调用 _try_delete_external_files。
+        """
+        image_rows = TokenService._collect_image_rows_for_token_str(token_str, cursor)
+        result = TokenService._delete_image_records_for_token_str(token_str, cursor, image_rows)
 
         return result
 
@@ -173,6 +198,7 @@ class TokenService:
         5. 删除 auth_tokens 记录
         """
         try:
+            image_rows: List[Dict[str, Any]] = []
             with get_connection() as conn:
                 cursor = conn.cursor()
 
@@ -189,7 +215,8 @@ class TokenService:
 
                 # 可选：删除关联图片
                 if delete_images:
-                    TokenService._delete_images_for_token_str(token_str, cursor)
+                    image_rows = TokenService._collect_image_rows_for_token_str(token_str, cursor)
+                    TokenService._delete_image_records_for_token_str(token_str, cursor, image_rows)
                 else:
                     # 仅置空 auth_token
                     cursor.execute(
@@ -214,6 +241,8 @@ class TokenService:
                 )
 
             action = "级联删除（含图片）" if delete_images else "级联删除"
+            if delete_images:
+                TokenService._try_delete_external_files(image_rows)
             logger.info(f"TokenService {action} Token: ID={token_id}")
             return True
 
@@ -305,6 +334,7 @@ class TokenService:
         fail = 0
         total_images_deleted = 0
         total_tg_deleted = 0
+        external_rows: List[Dict[str, Any]] = []
         try:
             with get_connection() as conn:
                 cursor = conn.cursor()
@@ -322,9 +352,10 @@ class TokenService:
 
                         # 可选：删除关联图片
                         if delete_images:
-                            img_result = TokenService._delete_images_for_token_str(token_str, cursor)
+                            image_rows = TokenService._collect_image_rows_for_token_str(token_str, cursor)
+                            img_result = TokenService._delete_image_records_for_token_str(token_str, cursor, image_rows)
+                            external_rows.extend(image_rows)
                             total_images_deleted += img_result["images_deleted"]
-                            total_tg_deleted += img_result["tg_deleted"]
                         else:
                             cursor.execute(
                                 "UPDATE file_storage SET auth_token = NULL WHERE auth_token = ?",
@@ -350,6 +381,9 @@ class TokenService:
             logger.error(f"TokenService 批量删除失败: {e}")
             raise
         action = "批量删除（含图片）" if delete_images else "批量删除"
+        if delete_images:
+            external_result = TokenService._try_delete_external_files(external_rows)
+            total_tg_deleted = external_result.get("tg_deleted", 0)
         logger.info(f"TokenService {action}: 成功={success}, 失败={fail}")
         result = {"success_count": success, "fail_count": fail}
         if delete_images:
@@ -390,6 +424,7 @@ class TokenService:
         if not token:
             return False
         try:
+            image_rows: List[Dict[str, Any]] = []
             with get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT 1 FROM auth_tokens WHERE token = ?", (token,))
@@ -398,7 +433,8 @@ class TokenService:
 
                 # 可选：删除关联图片
                 if delete_images:
-                    TokenService._delete_images_for_token_str(token, cursor)
+                    image_rows = TokenService._collect_image_rows_for_token_str(token, cursor)
+                    TokenService._delete_image_records_for_token_str(token, cursor, image_rows)
                 else:
                     cursor.execute(
                         "UPDATE file_storage SET auth_token = NULL WHERE auth_token = ?",
@@ -416,6 +452,8 @@ class TokenService:
                 cursor.execute("DELETE FROM auth_tokens WHERE token = ?", (token,))
 
             action = "用户侧级联删除（含图片）" if delete_images else "用户侧级联删除"
+            if delete_images:
+                TokenService._try_delete_external_files(image_rows)
             logger.info(f"{action} Token: {token[:20]}...")
             return True
         except Exception as e:

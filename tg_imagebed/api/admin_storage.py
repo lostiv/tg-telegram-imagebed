@@ -12,7 +12,7 @@ from . import admin_bp
 from .admin_helpers import _admin_json, _admin_options
 from ..config import logger
 from ..utils import add_cache_headers, format_size, get_image_domain
-from ..database import get_system_setting, update_system_setting
+from ..database import count_files_by_storage_backend, get_system_setting, update_system_setting
 from ..services.file_service import process_upload
 from ..storage.router import get_storage_router, reload_storage_router, _load_storage_config
 from .. import admin_module
@@ -379,6 +379,13 @@ def modify_storage_backend(name: str):
             active = router.get_active_backend_name()
             if name == active:
                 return _admin_json({'success': False, 'error': '无法删除当前激活的后端'}, 400)
+
+            referenced_count = count_files_by_storage_backend(name)
+            if referenced_count > 0:
+                return _admin_json({
+                    'success': False,
+                    'error': f"无法删除后端 '{name}'，仍有 {referenced_count} 个文件引用它。请先迁移或删除这些文件。",
+                }, 400)
 
             del backends[name]
             config['backends'] = backends
