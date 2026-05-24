@@ -31,6 +31,16 @@ export default defineNuxtConfig({
     '~/assets/css/main.scss'
   ],
 
+  vite: {
+    css: {
+      preprocessorOptions: {
+        scss: {
+          api: 'modern'
+        }
+      }
+    }
+  },
+
   // 运行时配置
   runtimeConfig: {
     public: {

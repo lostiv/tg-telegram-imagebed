@@ -208,6 +208,25 @@ def delete_files_by_ids(encrypted_ids: List[str]) -> tuple:
 
         return deleted_count, deleted_size
 
+
+@db_retry(max_attempts=3, base_delay=0.1, max_delay=2.0)
+def count_files_by_storage_backend(storage_backend: str) -> int:
+    """统计仍引用指定存储后端的文件数量。"""
+    storage_backend = str(storage_backend or '').strip()
+    if not storage_backend:
+        return 0
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT COUNT(*)
+            FROM file_storage
+            WHERE storage_backend = ?
+            ''',
+            (storage_backend,),
+        )
+        return int(cursor.fetchone()[0] or 0)
+
 # ===================== 统计查询（admin_module.py 兼容） =====================
 def get_all_files_count() -> int:
     """获取所有文件数量（admin_module.py 兼容接口）"""

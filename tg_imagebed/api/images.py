@@ -157,6 +157,35 @@ def serve_image(encrypted_id):
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
+    if request.method == 'HEAD':
+        content_type = file_info.get('mime_type') or 'application/octet-stream'
+        content_length = int(file_info.get('file_size') or 0)
+        path_for_ext = file_info.get('file_path') or file_info.get('original_filename') or ''
+        file_ext = Path(path_for_ext).suffix or '.jpg'
+        filename = f"image_{encrypted_id[:12]}{file_ext}"
+        response = Response(status=200, mimetype=content_type)
+        response.headers['Content-Length'] = str(content_length)
+        response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Accept-Ranges'] = 'bytes'
+        response.headers['ETag'] = etag
+        response.headers['X-Access-Type'] = access_type
+        response.headers['X-Storage-Backend'] = file_info.get('storage_backend') or 'telegram'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Range, Cache-Control'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, ETag, X-Storage-Backend'
+        if cdn_mode:
+            if is_new_file:
+                response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=300'
+            else:
+                response.headers['Cache-Control'] = 'public, max-age=31536000, s-maxage=2592000, immutable'
+            response.headers['Vary'] = 'Accept-Encoding'
+            response.headers['Cache-Tag'] = f'image-{encrypted_id[:8]},imagebed,static'
+        else:
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
+
     # 从存储后端下载图片
     try:
         router = get_storage_router()

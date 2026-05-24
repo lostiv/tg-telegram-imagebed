@@ -1029,6 +1029,7 @@ def delete_token_by_string(token: str, *, delete_images: bool = False) -> bool:
     token = (token or '').strip()
     if not token:
         return False
+    image_rows = []
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -1040,7 +1041,8 @@ def delete_token_by_string(token: str, *, delete_images: bool = False) -> bool:
             # 可选：删除关联图片
             if delete_images:
                 from ..services.token_service import TokenService
-                TokenService._delete_images_for_token_str(token, cursor)
+                image_rows = TokenService._collect_image_rows_for_token_str(token, cursor)
+                TokenService._delete_image_records_for_token_str(token, cursor, image_rows)
             else:
                 # 仅置空 auth_token
                 cursor.execute(
@@ -1058,6 +1060,9 @@ def delete_token_by_string(token: str, *, delete_images: bool = False) -> bool:
                 (token,),
             )
             cursor.execute("DELETE FROM auth_tokens WHERE token = ?", (token,))
+        if delete_images:
+            from ..services.token_service import TokenService
+            TokenService._try_delete_external_files(image_rows)
         action = "级联删除（含图片）" if delete_images else "级联删除"
         logger.info(f"用户侧{action} Token: {token[:20]}...")
         return True

@@ -16,7 +16,7 @@ from .files import (
     update_cdn_cache_status, update_access_count, delete_files_by_ids,
     get_all_files_count, get_total_size, get_stats,
     get_recent_uploads, get_uncached_files, get_cdn_dashboard_stats,
-    get_user_uploads,
+    get_user_uploads, count_files_by_storage_backend,
 )
 
 # Token 管理（用户 + 管理员）
@@ -106,7 +106,7 @@ __all__ = [
     # 统计（admin_module.py 兼容）
     'get_all_files_count', 'get_total_size', 'get_stats',
     'get_recent_uploads', 'get_uncached_files', 'get_cdn_dashboard_stats',
-    'get_user_uploads',
+    'get_user_uploads', 'count_files_by_storage_backend',
     # Token
     'generate_auth_token', 'create_auth_token', 'verify_auth_token',
     'verify_auth_token_access', 'update_token_description',
