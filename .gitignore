@@ -62,3 +62,4 @@ tests/
 tmp/
 temp/
 *.tmp
+.codegraph/
