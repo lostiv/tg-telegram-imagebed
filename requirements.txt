@@ -6,7 +6,7 @@ tgcrypto-pyrofork==1.2.8; python_version >= "3.13"
 
 # Web Framework
 Flask==3.0.0
-flask-cors==4.0.0
+flask-cors==6.0.2
 
 # HTTP Client
 aiohttp==3.13.5

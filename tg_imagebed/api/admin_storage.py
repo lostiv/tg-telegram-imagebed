@@ -73,6 +73,39 @@ def _save_storage_config(config: dict) -> None:
     reload_storage_router()
 
 
+def _find_upload_policy_backend_refs(backend_name: str) -> list[str]:
+    """查找上传策略中仍引用指定后端的字段。"""
+    backend_name = str(backend_name or '').strip()
+    if not backend_name:
+        return []
+
+    raw = str(get_system_setting('storage_upload_policy_json') or '').strip()
+    if not raw:
+        return []
+
+    try:
+        policy = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+    if not isinstance(policy, dict):
+        return []
+
+    refs = []
+    for key in ('guest', 'token', 'group', 'admin_default'):
+        if str(policy.get(key) or '').strip() == backend_name:
+            refs.append(key)
+
+    admin_allowed = policy.get('admin_allowed')
+    if isinstance(admin_allowed, list):
+        for value in admin_allowed:
+            if str(value or '').strip() == backend_name:
+                refs.append('admin_allowed')
+                break
+
+    return refs
+
+
 @admin_bp.route('/api/admin/storage', methods=['GET', 'OPTIONS'])
 @admin_module.login_required
 def get_storage_backends():
@@ -385,6 +418,13 @@ def modify_storage_backend(name: str):
                 return _admin_json({
                     'success': False,
                     'error': f"无法删除后端 '{name}'，仍有 {referenced_count} 个文件引用它。请先迁移或删除这些文件。",
+                }, 400)
+
+            policy_refs = _find_upload_policy_backend_refs(name)
+            if policy_refs:
+                return _admin_json({
+                    'success': False,
+                    'error': f"无法删除后端 '{name}'，上传策略仍引用它: {', '.join(policy_refs)}。请先调整上传策略。",
                 }, 400)
 
             del backends[name]

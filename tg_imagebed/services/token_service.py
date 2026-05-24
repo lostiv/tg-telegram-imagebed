@@ -64,12 +64,12 @@ class TokenService:
                 yield seq[i:i + size]
 
         for chunk in _chunked(encrypted_ids):
-            placeholders = ','.join('?' * len(chunk))
-            cursor.execute(
-                f"DELETE FROM file_storage WHERE encrypted_id IN ({placeholders})",
-                chunk,
+            cursor.executemany(
+                "DELETE FROM file_storage WHERE encrypted_id = ?",
+                ((encrypted_id,) for encrypted_id in chunk),
             )
-            result["images_deleted"] += cursor.rowcount
+            if cursor.rowcount > 0:
+                result["images_deleted"] += cursor.rowcount
 
         if result["images_deleted"] > 0:
             cursor.execute(

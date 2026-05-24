@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -257,6 +258,38 @@ class SmokeRouteTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload["success"])
         self.assertIn("仍有", payload["error"])
+
+    def test_delete_policy_referenced_storage_backend_is_blocked(self):
+        storage_config = {
+            "active": "telegram",
+            "backends": {
+                "telegram": {"driver": "telegram", "chat_id": "1"},
+                "policy_backend": {"driver": "local", "root_dir": str(Path(self.temp_dir.name) / "policy")},
+            },
+        }
+        upload_policy = {
+            "guest": "policy_backend",
+            "token": "",
+            "group": "",
+            "admin_default": "",
+            "admin_allowed": ["policy_backend"],
+        }
+        update_system_setting("storage_config_json", json.dumps(storage_config))
+        update_system_setting("storage_upload_policy_json", json.dumps(upload_policy))
+
+        with self.client.session_transaction() as session:
+            session["admin_logged_in"] = True
+            session["admin_username"] = "admin"
+            session["admin_token"] = "admin-smoke-token"
+
+        response = self.client.delete("/api/admin/storage/backends/policy_backend")
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload["success"])
+        self.assertIn("上传策略", payload["error"])
+        self.assertIn("guest", payload["error"])
+        self.assertIn("admin_allowed", payload["error"])
 
 
     def test_admin_images_guest_filter_includes_web_upload_source(self):

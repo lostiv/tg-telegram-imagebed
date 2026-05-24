@@ -209,6 +209,7 @@ def delete_files_by_ids(encrypted_ids: List[str]) -> tuple:
         return deleted_count, deleted_size
 
 
+@db_retry(max_attempts=3, base_delay=0.1, max_delay=2.0)
 def count_files_by_storage_backend(storage_backend: str) -> int:
     """统计仍引用指定存储后端的文件数量。"""
     storage_backend = str(storage_backend or '').strip()
