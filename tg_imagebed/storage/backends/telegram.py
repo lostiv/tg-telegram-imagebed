@@ -281,7 +281,8 @@ class TelegramBackend(StorageBackend):
                 return None
             file_id = photos[-1].get('file_id')
         else:
-            doc = result.get('document') or {}
+            # Telegram 可能将符合贴纸规格的 webp 自动转为 sticker 返回
+            doc = result.get('document') or result.get('sticker') or {}
             file_id = doc.get('file_id')
 
         if not file_id:
