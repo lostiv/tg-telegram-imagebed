@@ -270,37 +270,33 @@ const announcementTemplates: AnnouncementTemplate[] = [
   {
     name: '欢迎公告',
     description: '介绍站点特性与上传优势',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-stone-900 dark:text-white">欢迎来到花语阁图床</h3>
-  <p class="text-stone-700 dark:text-stone-300">支持游客上传、Token 管理和画集分享，图片链接可长期访问。</p>
-  <ul class="list-disc space-y-1 pl-5 text-stone-700 dark:text-stone-300">
-    <li>上传流程简洁，支持批量与拖拽</li>
-    <li>画集页面支持公开分享与封面展示</li>
-    <li>后台可灵活管理存储、路由与访问策略</li>
-  </ul>
-</div>`,
+    content: `欢迎来到花语阁图床
+
+支持游客上传、Token 管理和画集分享，图片链接可长期访问。
+
+- 上传流程简洁，支持批量与拖拽
+- 画集页面支持公开分享与封面展示
+- 后台可灵活管理存储、路由与访问策略`,
   },
   {
     name: '维护通知',
     description: '系统维护窗口提醒',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-rose-600 dark:text-rose-400">系统维护通知</h3>
-  <p class="text-stone-700 dark:text-stone-300">为了提升稳定性，系统将在维护窗口进行升级，期间可能出现短时上传延迟。</p>
-  <p class="text-stone-700 dark:text-stone-300">建议提前完成关键上传任务，维护完成后会第一时间恢复全部能力。</p>
-</div>`,
+    content: `系统维护通知
+
+为了提升稳定性，系统将在维护窗口进行升级，期间可能出现短时上传延迟。
+
+建议提前完成关键上传任务，维护完成后会第一时间恢复全部能力。`,
   },
   {
     name: '功能更新',
     description: '发布新版功能亮点',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-blue-600 dark:text-blue-400">功能更新已上线</h3>
-  <p class="text-stone-700 dark:text-stone-300">本次更新包含以下内容：</p>
-  <ul class="list-disc space-y-1 pl-5 text-stone-700 dark:text-stone-300">
-    <li>画集首页展示机制优化，信息密度更高</li>
-    <li>后台管理界面重构，移动端交互更友好</li>
-    <li>Token 与登录链路稳定性提升</li>
-  </ul>
-</div>`,
+    content: `功能更新已上线
+
+本次更新包含以下内容：
+
+- 画集首页展示机制优化，信息密度更高
+- 后台管理界面重构，移动端交互更友好
+- Token 与登录链路稳定性提升`,
   },
 ]
 
@@ -342,9 +338,9 @@ const formatDate = (dateString: string | null) => {
   })
 }
 
-const extractTemplateSummary = (html: string): string => {
-  const plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return plain.slice(0, 70) + (plain.length > 70 ? '...' : '')
+const extractTemplateSummary = (content: string): string => {
+  const firstLine = content.split('\n').find(line => line.trim())?.trim() || ''
+  return firstLine.slice(0, 70) + (firstLine.length > 70 ? '...' : '')
 }
 
 const canSaveCurrentState = (): boolean => {
