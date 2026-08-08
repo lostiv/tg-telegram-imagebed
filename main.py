@@ -14,6 +14,7 @@ import sys
 import time
 import signal
 import threading
+import os
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -26,6 +27,7 @@ from tg_imagebed.config import (
     STATIC_FOLDER,
     logger
 )
+from tg_imagebed.utils import is_trusted_proxy
 
 # 导入 Bot 控制模块
 from tg_imagebed.bot_control import (
@@ -91,8 +93,17 @@ def create_app() -> Flask:
         app.config['MAX_CONTENT_LENGTH'] = (max_mb + 2) * 1024 * 1024
         return max_mb
 
-    # 应用 ProxyFix 中间件
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # 仅允许配置的代理传递 X-Forwarded-* 请求头。
+    if os.environ.get('TRUSTED_PROXY', '').strip():
+        original_wsgi_app = app.wsgi_app
+        proxy_wsgi_app = ProxyFix(original_wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+        def trusted_proxy_wsgi(environ, start_response):
+            if is_trusted_proxy(environ.get('REMOTE_ADDR', '')):
+                return proxy_wsgi_app(environ, start_response)
+            return original_wsgi_app(environ, start_response)
+
+        app.wsgi_app = trusted_proxy_wsgi
 
     # CORS 配置 - 分层策略
     # 管理员 API 需要 credentials（session cookie），必须使用明确的域名白名单

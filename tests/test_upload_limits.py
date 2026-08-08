@@ -3,6 +3,7 @@
 import tempfile
 import threading
 import unittest
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -27,7 +28,7 @@ from tg_imagebed.database import (
     create_tg_session,
     count_tokens_by_ip,
 )
-from tg_imagebed.utils import validate_image_magic
+from tg_imagebed.utils import get_client_ip, validate_image_magic
 from tg_imagebed.services.token_service import TokenService
 
 
@@ -187,6 +188,24 @@ class UploadLimitTests(unittest.TestCase):
 
     def test_validate_image_magic_rejects_svg(self):
         self.assertIsNone(validate_image_magic(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"))
+
+    def test_client_ip_ignores_forwarded_headers_without_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={"X-Forwarded-For": "203.0.113.1"},
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": ""}):
+            self.assertEqual(get_client_ip(request), "198.51.100.2")
+
+    def test_client_ip_accepts_headers_from_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={"X-Forwarded-For": "203.0.113.1"},
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}):
+            self.assertEqual(get_client_ip(request), "203.0.113.1")
 
     def test_delete_token_with_images_succeeds_when_external_cleanup_fails(self):
         token = create_auth_token(

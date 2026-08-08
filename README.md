@@ -111,6 +111,7 @@ npm run generate
 | --- | --- | --- |
 | `ALLOWED_ORIGINS` | 管理后台 / TG 认证跨域白名单 | 默认 `*` 仅对公共 API 宽松，管理员接口仍会退回本地白名单 |
 | `HTTP_PROXY` / `HTTPS_PROXY` | 系统代理 | 后端请求 Telegram / 外部服务时可复用 |
+| `TRUSTED_PROXY` | 可信反向代理 IP 或 CIDR，逗号分隔 | 仅该对端可传递客户端 IP 与 `X-Forwarded-*` 头，例如 `127.0.0.1,172.18.0.0/16` |
 | `BOT_TOKEN` / `TELEGRAM_BOT_TOKEN` | Bot Token 兜底 | 数据库未配置时才会回退读取 |
 
 另外，存储配置 JSON 里支持 `env:VAR_NAME` 形式引用环境变量。

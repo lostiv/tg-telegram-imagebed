@@ -123,6 +123,26 @@ VALID_IMAGE_MIME_TYPES = frozenset(IMAGE_SIGNATURES.values()) | {
 }
 
 
+def is_trusted_proxy(remote_addr: str) -> bool:
+    """检查连接对端是否在 TRUSTED_PROXY 配置的 IP 或网段中。"""
+    raw_proxies = os.environ.get('TRUSTED_PROXY', '')
+    remote_ip = _normalize_ip_candidate(remote_addr)
+    if not raw_proxies or not remote_ip:
+        return False
+
+    address = ipaddress.ip_address(remote_ip)
+    for value in raw_proxies.split(','):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            if address in ipaddress.ip_network(value, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def validate_image_magic(content: bytes) -> Optional[str]:
     """根据文件魔数识别允许的图片格式。"""
     if len(content) < 12:
@@ -188,7 +208,7 @@ def _normalize_ip_candidate(raw_value: str) -> Optional[str]:
 
 def get_client_ip(req) -> str:
     """
-    提取真实客户端 IP（兼容 Cloudflare + 反向代理）
+    提取真实客户端 IP；仅信任可信代理发送的转发头。
 
     优先级：
     1. CF-Connecting-IP / True-Client-IP（Cloudflare）
@@ -197,6 +217,11 @@ def get_client_ip(req) -> str:
     4. X-Real-IP
     5. remote_addr
     """
+    original_remote_addr = (getattr(req, 'environ', {}).get('werkzeug.proxy_fix.orig', {})
+                            .get('REMOTE_ADDR', req.remote_addr))
+    if not is_trusted_proxy(original_remote_addr):
+        return _normalize_ip_candidate(req.remote_addr) or str(req.remote_addr or '')
+
     for header_name in ('CF-Connecting-IP', 'True-Client-IP'):
         normalized = _normalize_ip_candidate(req.headers.get(header_name))
         if normalized:
