@@ -630,9 +630,12 @@ console.log(await res.json())`,
             status: 200,
             description: '健康状态',
             example: `{
-  "status": "healthy",
-  "timestamp": 1735689600,
-  "cdn_enabled": true
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": 1735689600,
+    "cdn_enabled": true
+  }
 }`,
           },
         ],

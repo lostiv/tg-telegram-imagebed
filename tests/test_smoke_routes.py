@@ -154,7 +154,17 @@ class SmokeRouteTests(unittest.TestCase):
             response = self.client.get("/api/health")
 
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.get_json()["status"], "unhealthy")
+        payload = response.get_json()
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["error"], "基础依赖不可用")
+
+    def test_health_check_returns_healthy_status(self):
+        response = self.client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["data"]["status"], "healthy")
 
     def test_token_upload_full_flow(self):
         token_response = self.client.post(

@@ -393,11 +393,8 @@ def health_check():
     except Exception as e:
         logger.error(f"健康检查失败: {e}")
         response = jsonify({
-            'status': 'unhealthy',
-            'timestamp': int(time.time()),
-            'checks': checks,
+            'success': False,
             'error': '基础依赖不可用',
-            'version': STATIC_VERSION
         })
         response.headers['Access-Control-Allow-Origin'] = '*'
         return add_cache_headers(response, 'no-cache'), 503
@@ -406,15 +403,18 @@ def health_check():
     cdn_redirect_enabled = str(get_system_setting('cdn_redirect_enabled') or '0') == '1'
 
     response = jsonify({
-        'status': 'healthy',
-        'timestamp': int(time.time()),
-        'base_url': get_domain(request),
-        'cdn_enabled': cdn_enabled,
-        'cdn_mode': cdn_mode,
-        'cloudflare_cdn': bool(cdn_domain),
-        'cdn_redirect_enabled': cdn_redirect_enabled,
-        'checks': checks,
-        'version': STATIC_VERSION
+        'success': True,
+        'data': {
+            'status': 'healthy',
+            'timestamp': int(time.time()),
+            'base_url': get_domain(request),
+            'cdn_enabled': cdn_enabled,
+            'cdn_mode': cdn_mode,
+            'cloudflare_cdn': bool(cdn_domain),
+            'cdn_redirect_enabled': cdn_redirect_enabled,
+            'checks': checks,
+            'version': STATIC_VERSION
+        }
     })
     response.headers['Access-Control-Allow-Origin'] = '*'
     return add_cache_headers(response, 'no-cache')
