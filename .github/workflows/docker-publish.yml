@@ -51,6 +51,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine version
         id: version
@@ -175,6 +176,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Update VERSION (bumped by prepare job)
         run: echo "${{ needs.prepare.outputs.version }}" > VERSION
@@ -213,6 +216,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Update VERSION (bumped by prepare job)
         run: echo "${{ needs.prepare.outputs.version }}" > VERSION
