@@ -234,6 +234,30 @@ class SmokeRouteTests(unittest.TestCase):
         self.assertEqual(response.data, b"")
         get_backend.assert_not_called()
 
+    def test_share_all_hides_admin_only_gallery(self):
+        from tg_imagebed.database import get_connection
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO share_all_links (share_token, enabled) VALUES (?, 1)",
+                ("share-all-test",),
+            )
+            cursor.execute(
+                "INSERT INTO galleries (name, access_mode, hide_from_share_all) VALUES (?, ?, 0)",
+                ("仅管理员", "admin_only"),
+            )
+            gallery_id = cursor.lastrowid
+
+        list_response = self.client.get("/api/shared/all/share-all-test")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.get_json()["data"]["total"], 0)
+
+        detail_response = self.client.get(
+            f"/api/shared/all/share-all-test/galleries/{gallery_id}"
+        )
+        self.assertEqual(detail_response.status_code, 404)
+
     def test_delete_referenced_storage_backend_is_blocked(self):
         upload_response = self._upload_png("/api/upload")
         self.assertEqual(upload_response.status_code, 200)

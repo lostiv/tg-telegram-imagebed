@@ -460,6 +460,7 @@ def get_share_all_galleries(share_token: str, page: int = 1, limit: int = 50) ->
                        )) AS cover_image
                 FROM galleries g
                 WHERE g.hide_from_share_all = 0
+                  AND g.access_mode != 'admin_only'
                 ORDER BY g.updated_at DESC
                 LIMIT ? OFFSET ?
             ''', (limit, offset))
@@ -469,6 +470,7 @@ def get_share_all_galleries(share_token: str, page: int = 1, limit: int = 50) ->
             cursor.execute('''
                 SELECT COUNT(*) FROM galleries
                 WHERE hide_from_share_all = 0
+                  AND access_mode != 'admin_only'
             ''')
             total = cursor.fetchone()[0]
 
@@ -511,6 +513,7 @@ def get_share_all_gallery(share_token: str, gallery_id: int) -> Optional[Dict[st
                 FROM galleries g
                 WHERE g.id = ?
                   AND g.hide_from_share_all = 0
+                  AND g.access_mode != 'admin_only'
                 LIMIT 1
             ''', (gallery_id,))
             row = cursor.fetchone()
@@ -540,6 +543,7 @@ def get_share_all_gallery_images(
                 SELECT 1 FROM galleries
                 WHERE id = ?
                   AND hide_from_share_all = 0
+                  AND access_mode != 'admin_only'
                 LIMIT 1
             ''', (gallery_id,))
             if not cursor.fetchone():

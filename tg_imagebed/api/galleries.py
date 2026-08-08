@@ -563,6 +563,9 @@ def shared_all_gallery_detail_api(share_all_token: str, gallery_id: int):
 
     # 管理员跳过所有访问限制
     if not is_admin:
+        if access_mode == 'admin_only':
+            return _json_response({'success': False, 'error': '分享链接无效或画集不可见'}, 404)
+
         # 检查密码保护
         if access_mode == 'password':
             unlock_cookie = request.cookies.get(f'gallery_unlock_{gallery["id"]}')
