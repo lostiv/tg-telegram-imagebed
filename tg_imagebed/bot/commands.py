@@ -302,7 +302,8 @@ async def _handle_myuploads_page(query):
 
 async def _handle_confirm_delete(query):
     """处理 /delete 确认/取消回调"""
-    from ..database import get_file_info, delete_files_by_ids, get_system_setting
+    from ..database import get_file_info, get_system_setting
+    from ..services.file_service import delete_file_with_storage
 
     parts = query.data.split(":")
     if len(parts) != 3:
@@ -332,8 +333,7 @@ async def _handle_confirm_delete(query):
         await query.edit_message_text("❌ 你没有权限删除此文件")
         return
 
-    deleted_count, deleted_size = delete_files_by_ids([encrypted_id])
-    if deleted_count > 0:
+    if delete_file_with_storage(encrypted_id):
         await query.edit_message_text("✅ 文件已成功删除")
     else:
         await query.edit_message_text("❌ 删除失败，请稍后重试")
@@ -341,7 +341,8 @@ async def _handle_confirm_delete(query):
 
 async def _handle_quick_delete(query):
     """处理上传成功后的快速删除按钮"""
-    from ..database import get_file_info, delete_files_by_ids, get_system_setting
+    from ..database import get_file_info, get_system_setting
+    from ..services.file_service import delete_file_with_storage
 
     if str(get_system_setting('bot_user_delete_enabled') or '1') != '1':
         await query.edit_message_text("❌ 自助删除功能已关闭")
@@ -364,8 +365,7 @@ async def _handle_quick_delete(query):
         await query.edit_message_text("❌ 你没有权限删除此文件")
         return
 
-    deleted_count, _ = delete_files_by_ids([encrypted_id])
-    if deleted_count > 0:
+    if delete_file_with_storage(encrypted_id):
         await query.edit_message_text("✅ 文件已删除")
     else:
         await query.edit_message_text("❌ 删除失败，请稍后重试")

@@ -32,6 +32,7 @@ from tg_imagebed.database import (
 )
 from tg_imagebed.utils import get_client_ip, get_domain, validate_image_magic
 from tg_imagebed.services.token_service import TokenService
+from tg_imagebed.services.file_service import delete_file_with_storage
 
 
 class UploadLimitTests(unittest.TestCase):
@@ -317,6 +318,29 @@ class UploadLimitTests(unittest.TestCase):
             self.assertEqual(cursor.fetchone()[0], 0)
             cursor.execute("SELECT COUNT(*) FROM file_storage WHERE encrypted_id = ?", ("cleanup-test-id",))
             self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_delete_file_with_storage_cleans_external_object(self):
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO file_storage (
+                    encrypted_id, file_id, file_path, upload_time, file_size, source,
+                    original_filename, mime_type, storage_backend, storage_key, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                ("bot-delete-id", "file-id", "file-path", 1234567890, 12,
+                 "telegram", "pixel.png", "image/png", "telegram", "storage-key"),
+            )
+
+        with patch.object(TokenService, "_try_delete_external_files") as delete_external:
+            self.assertTrue(delete_file_with_storage("bot-delete-id"))
+
+        delete_external.assert_called_once()
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM file_storage WHERE encrypted_id = ?", ("bot-delete-id",)
+            ).fetchone()
+        self.assertIsNone(row)
 
 
 if __name__ == "__main__":

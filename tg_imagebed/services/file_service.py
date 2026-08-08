@@ -15,7 +15,7 @@ import requests
 from ..config import logger
 from ..database import (
     save_file_info, get_file_info, update_file_path_in_db, release_upload_reservation,
-    get_system_setting_int,
+    get_system_setting_int, delete_files_by_ids,
 )
 from ..utils import sign_file_id, get_mime_type, validate_image_magic
 from .cdn_service import add_to_cdn_monitor
@@ -48,6 +48,18 @@ def get_fresh_file_path(file_id: str) -> Optional[str]:
     bot_token, _ = get_effective_bot_token()
     if not bot_token or not file_id:
         return None
+
+
+def delete_file_with_storage(encrypted_id: str) -> bool:
+    """删除文件记录及其存储对象，外部清理失败不阻断数据库删除。"""
+    file_info = get_file_info(encrypted_id)
+    if not file_info:
+        return False
+
+    from .token_service import TokenService
+    TokenService._try_delete_external_files([file_info])
+    deleted_count, _ = delete_files_by_ids([encrypted_id])
+    return deleted_count > 0
 
     try:
         response = requests.get(
