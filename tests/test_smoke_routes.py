@@ -234,6 +234,22 @@ class SmokeRouteTests(unittest.TestCase):
         self.assertEqual(response.data, b"")
         get_backend.assert_not_called()
 
+    def test_head_image_rejects_legacy_svg_mime_type(self):
+        upload_response = self._upload_png("/api/upload")
+        self.assertEqual(upload_response.status_code, 200)
+        encrypted_id = upload_response.get_json()["data"]["url"].rsplit("/", 1)[-1]
+
+        from tg_imagebed.database import get_connection
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE file_storage SET mime_type = ? WHERE encrypted_id = ?",
+                ("image/svg+xml", encrypted_id),
+            )
+
+        response = self.client.head(f"/image/{encrypted_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/octet-stream")
+
     def test_share_all_hides_admin_only_gallery(self):
         from tg_imagebed.database import get_connection
 

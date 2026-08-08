@@ -160,6 +160,8 @@ def serve_image(encrypted_id):
 
     if request.method == 'HEAD':
         content_type = file_info.get('mime_type') or 'application/octet-stream'
+        if content_type not in VALID_IMAGE_MIME_TYPES:
+            content_type = 'application/octet-stream'
         content_length = int(file_info.get('file_size') or 0)
         path_for_ext = file_info.get('file_path') or file_info.get('original_filename') or ''
         file_ext = Path(path_for_ext).suffix or '.jpg'
