@@ -107,6 +107,50 @@ LOCAL_IP = get_local_ip()
 
 
 # ===================== 客户端 IP 解析 =====================
+IMAGE_SIGNATURES = {
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"\xff\xd8\xff": "image/jpeg",
+    b"GIF87a": "image/gif",
+    b"GIF89a": "image/gif",
+    b"RIFF": "image/webp",
+    b"BM": "image/bmp",
+    b"\x49\x49\x2A\x00": "image/tiff",
+    b"\x4D\x4D\x00\x2A": "image/tiff",
+    b"\x00\x00\x01\x00": "image/x-icon",
+}
+VALID_IMAGE_MIME_TYPES = frozenset(IMAGE_SIGNATURES.values()) | {
+    "image/avif", "image/heic"
+}
+
+
+def validate_image_magic(content: bytes) -> Optional[str]:
+    """根据文件魔数识别允许的图片格式。"""
+    if len(content) < 12:
+        return None
+
+    for signature, mime_type in IMAGE_SIGNATURES.items():
+        if not content.startswith(signature):
+            continue
+        if signature == b"RIFF" and content[8:12] != b"WEBP":
+            continue
+        return mime_type
+
+    if content[4:8] == b"ftyp":
+        major_brand = content[8:12]
+        if major_brand in (b"avif", b"avis"):
+            return "image/avif"
+        if major_brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+            return "image/heic"
+        compat_region = content[16:min(64, len(content))]
+        for i in range(0, len(compat_region) - 3, 4):
+            brand = compat_region[i:i + 4]
+            if brand in (b"avif", b"avis"):
+                return "image/avif"
+            if brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+                return "image/heic"
+    return None
+
+
 def _normalize_ip_candidate(raw_value: str) -> Optional[str]:
     """将请求头中的 IP 候选值规范化为可用 IP 字符串，失败返回 None"""
     value = str(raw_value or '').strip()

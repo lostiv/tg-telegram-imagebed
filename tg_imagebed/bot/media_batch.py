@@ -90,6 +90,7 @@ async def _flush_media_group(
     import asyncio
     from ..services.file_service import record_existing_telegram_file
     from ..utils import get_image_domain
+    from ..database import get_system_setting_int
     from .state import _inc_bot_stats
 
     try:
@@ -125,12 +126,17 @@ async def _flush_media_group(
     total_size_bytes = 0
     total_count = len(batch.items)
     failure_count = 0
+    max_size_mb = get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+    max_size_bytes = max_size_mb * 1024 * 1024
 
     # 按消息ID排序处理
     for item in sorted(batch.items, key=lambda x: x.get("message_id", 0)):
         try:
             file_id = item.get("file_id")
             if not file_id:
+                failure_count += 1
+                continue
+            if (item.get('file_size') or 0) > max_size_bytes:
                 failure_count += 1
                 continue
 

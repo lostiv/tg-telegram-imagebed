@@ -20,7 +20,8 @@ from ..database import (
     get_system_setting, get_system_setting_int
 )
 from ..utils import (
-    add_cache_headers, format_size, get_domain, get_image_domain, get_static_file_version
+    VALID_IMAGE_MIME_TYPES, add_cache_headers, format_size, get_domain,
+    get_image_domain, get_static_file_version
 )
 from ..services.cdn_service import cloudflare_cdn, get_monitor_queue_size
 from ..storage.router import get_storage_router
@@ -225,10 +226,13 @@ def serve_image(encrypted_id):
         resp_headers['Access-Control-Allow-Headers'] = 'Range, Cache-Control'
         resp_headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, ETag, X-Storage-Backend'
 
+        mime_type = file_info.get('mime_type')
+        if mime_type not in VALID_IMAGE_MIME_TYPES:
+            mime_type = 'application/octet-stream'
         resp = Response(
             dl.body,
             status=dl.status_code,
-            mimetype=dl.content_type or (file_info.get('mime_type') or 'application/octet-stream'),
+            mimetype=mime_type,
             headers=resp_headers
         )
 

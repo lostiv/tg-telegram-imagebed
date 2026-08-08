@@ -22,20 +22,7 @@ from ..database import (
     reserve_guest_upload,
 )
 from ..services.file_service import process_upload
-from ..utils import add_cache_headers, format_size, get_image_domain
-
-
-IMAGE_SIGNATURES = {
-    b"\x89PNG\r\n\x1a\n": "image/png",
-    b"\xff\xd8\xff": "image/jpeg",
-    b"GIF87a": "image/gif",
-    b"GIF89a": "image/gif",
-    b"RIFF": "image/webp",
-    b"BM": "image/bmp",
-    b"\x49\x49\x2A\x00": "image/tiff",
-    b"\x4D\x4D\x00\x2A": "image/tiff",
-    b"\x00\x00\x01\x00": "image/x-icon",
-}
+from ..utils import add_cache_headers, format_size, get_image_domain, validate_image_magic
 
 
 @dataclass
@@ -50,37 +37,6 @@ class ValidatedUpload:
                 os.remove(self.temp_path)
         except OSError:
             logger.debug("Failed to clean temporary upload file: %s", self.temp_path)
-
-
-def validate_image_magic(content: bytes) -> Optional[str]:
-    """Validate the upload by file signature."""
-    if len(content) < 12:
-        return None
-
-    for signature, mime_type in IMAGE_SIGNATURES.items():
-        if not content.startswith(signature):
-            continue
-        if signature == b"RIFF" and content[8:12] != b"WEBP":
-            continue
-        return mime_type
-
-    if len(content) >= 12 and content[4:8] == b"ftyp":
-        # 检查 major brand（字节 8-11）和 compatible brands（字节 16+，每4字节）
-        major_brand = content[8:12]
-        if major_brand in (b"avif", b"avis"):
-            return "image/avif"
-        if major_brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
-            return "image/heic"
-        # 检查 compatible brands 区域
-        compat_region = content[16:min(64, len(content))]
-        for i in range(0, len(compat_region) - 3, 4):
-            brand = compat_region[i:i + 4]
-            if brand in (b"avif", b"avis"):
-                return "image/avif"
-            if brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
-                return "image/heic"
-
-    return None
 
 
 def is_extension_allowed(filename: str) -> bool:

@@ -27,7 +27,7 @@ from tg_imagebed.database import (
     create_tg_session,
     count_tokens_by_ip,
 )
-from tg_imagebed.api.upload import validate_image_magic
+from tg_imagebed.utils import validate_image_magic
 from tg_imagebed.services.token_service import TokenService
 
 
@@ -184,6 +184,9 @@ class UploadLimitTests(unittest.TestCase):
         )
 
         self.assertEqual(validate_image_magic(heic_header), "image/heic")
+
+    def test_validate_image_magic_rejects_svg(self):
+        self.assertIsNone(validate_image_magic(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"))
 
     def test_delete_token_with_images_succeeds_when_external_cleanup_fails(self):
         token = create_auth_token(
