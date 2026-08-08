@@ -554,13 +554,14 @@ def shared_all_galleries_api(share_token: str):
 @auth_bp.route('/api/shared/all/<share_all_token>/galleries/<int:gallery_id>', methods=['GET'])
 def shared_all_gallery_detail_api(share_all_token: str, gallery_id: int):
     """全部分享上下文中访问单个画集"""
-    gallery = get_share_all_gallery(share_all_token, gallery_id)
+    is_admin = _is_admin_logged_in()
+    gallery = get_share_all_gallery(
+        share_all_token, gallery_id, include_admin_only=is_admin
+    )
     if not gallery:
         return _json_response({'success': False, 'error': '分享链接无效或画集不可见'}, 404)
 
     access_mode = gallery.get('access_mode', 'public')
-    is_admin = _is_admin_logged_in()
-
     # 管理员跳过所有访问限制
     if not is_admin:
         if access_mode == 'admin_only':
@@ -619,7 +620,9 @@ def shared_all_gallery_detail_api(share_all_token: str, gallery_id: int):
     limit = request.args.get('limit', 50, type=int)
     limit = max(1, min(100, limit))
 
-    images_result = get_share_all_gallery_images(share_all_token, gallery['id'], page, limit)
+    images_result = get_share_all_gallery_images(
+        share_all_token, gallery['id'], page, limit, include_admin_only=is_admin
+    )
     if not images_result:
         return _json_response({'success': False, 'error': '分享链接无效或画集不可见'}, 404)
 

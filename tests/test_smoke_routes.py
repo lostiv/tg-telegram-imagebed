@@ -274,6 +274,16 @@ class SmokeRouteTests(unittest.TestCase):
         )
         self.assertEqual(detail_response.status_code, 404)
 
+        with self.client.session_transaction() as session:
+            session["admin_logged_in"] = True
+            session["admin_username"] = "admin"
+            session["admin_token"] = "admin-smoke-token"
+
+        admin_detail_response = self.client.get(
+            f"/api/shared/all/share-all-test/galleries/{gallery_id}"
+        )
+        self.assertEqual(admin_detail_response.status_code, 200)
+
     def test_delete_referenced_storage_backend_is_blocked(self):
         upload_response = self._upload_png("/api/upload")
         self.assertEqual(upload_response.status_code, 200)
