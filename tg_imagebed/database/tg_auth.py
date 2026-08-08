@@ -767,6 +767,13 @@ def consume_web_verify_code(code: str, tg_user_id: int) -> Optional[str]:
             if cursor.rowcount != 1:
                 return None
 
+            # 确保用户已注册（tg_sessions.tg_user_id 外键引用 tg_users）
+            cursor.execute('''
+                INSERT INTO tg_users (tg_user_id, username, first_name, last_name, last_login_at)
+                VALUES (?, NULL, NULL, NULL, CURRENT_TIMESTAMP)
+                ON CONFLICT(tg_user_id) DO UPDATE SET last_login_at = CURRENT_TIMESTAMP
+            ''', (tg_user_id,))
+
             expire_days = get_system_setting_int('tg_session_expire_days', 30, minimum=1, maximum=365)
             expires_at = datetime.utcnow() + timedelta(days=expire_days)
             session_token = secrets.token_urlsafe(48)
