@@ -114,7 +114,7 @@
         <AdminAnnouncementSectionCard
           :id="sectionDomId('editor')"
           title="内容编辑与预览"
-          description="左侧编辑 HTML 公告内容，右侧实时预览"
+          description="左侧编辑公告内容，右侧实时预览"
           icon="heroicons:pencil-square"
           :dirty="Boolean(dirtyMap.editor)"
           :saving="Boolean(sectionSaving.editor)"
@@ -125,19 +125,18 @@
             <div class="rounded-2xl border border-stone-200/80 bg-white/90 p-4 dark:border-neutral-700/80 dark:bg-neutral-900/70">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
-                  <UIcon name="heroicons:code-bracket-square" class="h-4 w-4 text-amber-500" />
-                  <p class="text-sm font-medium text-stone-900 dark:text-white">HTML 编辑器</p>
+                  <UIcon name="heroicons:pencil-square" class="h-4 w-4 text-amber-500" />
+                  <p class="text-sm font-medium text-stone-900 dark:text-white">公告编辑器</p>
                 </div>
-                <p class="text-xs text-stone-500 dark:text-stone-400">支持 HTML 标签</p>
+                <p class="text-xs text-stone-500 dark:text-stone-400">纯文本显示</p>
               </div>
               <UTextarea
                 v-model="announcement.content"
                 :rows="16"
-                placeholder="请输入公告内容，支持 HTML..."
-                class="mt-3 font-mono text-sm"
+                placeholder="请输入公告内容..."
+                class="mt-3 text-sm"
               />
               <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500 dark:text-stone-400">
-                <p>可用标签：&lt;strong&gt;、&lt;p&gt;、&lt;ul&gt;、&lt;a&gt;</p>
                 <p>字符数：{{ contentLength }}</p>
               </div>
             </div>
@@ -148,11 +147,7 @@
                 <p class="text-sm font-medium text-stone-900 dark:text-white">实时预览</p>
               </div>
               <div class="mt-3 min-h-[280px] max-h-[520px] overflow-y-auto rounded-xl border border-dashed border-stone-300 bg-stone-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/70">
-                <div
-                  v-if="announcement.content.trim()"
-                  class="announcement-preview-content prose max-w-none text-sm dark:prose-invert"
-                  v-html="announcement.content"
-                />
+                <div v-if="announcement.content.trim()" class="announcement-preview-content whitespace-pre-wrap text-sm">{{ announcement.content }}</div>
                 <div v-else class="flex min-h-[180px] items-center justify-center text-sm text-stone-400 dark:text-stone-500">
                   暂无公告内容，先在左侧输入文案
                 </div>

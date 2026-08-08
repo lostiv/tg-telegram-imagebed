@@ -27,10 +27,7 @@
 
       <div class="max-h-[62vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div v-if="announcement.content.trim()" class="announcement-content-shell">
-          <div
-            class="announcement-modal-content prose max-w-none text-sm dark:prose-invert sm:text-base"
-            v-html="announcement.content"
-          />
+          <div class="announcement-modal-content whitespace-pre-wrap text-sm sm:text-base">{{ announcement.content }}</div>
         </div>
         <div v-else class="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 text-sm text-stone-500 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-stone-400">
           暂无公告内容
@@ -151,40 +148,4 @@ defineExpose({
   color: rgb(228 228 231);
 }
 
-.announcement-modal-content:deep(h1),
-.announcement-modal-content:deep(h2),
-.announcement-modal-content:deep(h3) {
-  margin-top: 0;
-}
-
-.announcement-modal-content:deep(p),
-.announcement-modal-content:deep(li) {
-  line-height: 1.75;
-}
-
-.announcement-modal-content:deep(ul),
-.announcement-modal-content:deep(ol) {
-  margin: 0.7rem 0;
-  padding-left: 1.2rem;
-}
-
-.announcement-modal-content:deep(a) {
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-}
-
-.announcement-modal-content:deep(img),
-.announcement-modal-content:deep(video),
-.announcement-modal-content:deep(iframe),
-.announcement-modal-content:deep(pre),
-.announcement-modal-content:deep(blockquote),
-.announcement-modal-content:deep(table) {
-  border-radius: 0.8rem;
-  overflow: hidden;
-}
-
-.announcement-modal-content:deep(table) {
-  display: block;
-  width: 100%;
-}
 </style>
