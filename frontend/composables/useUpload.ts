@@ -12,6 +12,11 @@ export interface UploadProgress {
   percent: number
 }
 
+export interface UploadFailure {
+  filename: string
+  error: string
+}
+
 export const useUpload = () => {
   const config = useRuntimeConfig()
   const authStore = useAuthStore()
@@ -46,7 +51,14 @@ export const useUpload = () => {
       xhr.addEventListener('load', () => {
         cleanup()
         if (xhr.status >= 200 && xhr.status < 300) {
-          try { resolve(JSON.parse(xhr.responseText)) }
+          try {
+            const response = JSON.parse(xhr.responseText) as ApiResponse<UploadResult | TokenUploadResult>
+            if (!response.success) {
+              reject(new Error(response.error || '上传失败'))
+              return
+            }
+            resolve(response)
+          }
           catch { reject(new Error('解析响应失败')) }
         } else {
           try {
@@ -101,8 +113,9 @@ export const useUpload = () => {
   const uploadFiles = async (
     files: File[],
     onProgress?: (p: UploadProgress) => void
-  ): Promise<(UploadResult | TokenUploadResult)[]> => {
+  ): Promise<{ results: (UploadResult | TokenUploadResult)[]; failures: UploadFailure[] }> => {
     const results: (UploadResult | TokenUploadResult)[] = []
+    const failures: UploadFailure[] = []
 
     // 确定上传 URL 和认证方式
     // Token 优先：确保上传记录关联到 token，便于在上传历史和相册中查看
@@ -130,8 +143,15 @@ export const useUpload = () => {
       const { promise } = _xhrUpload(url, files[i], {
         headers, withCredentials, idx: i, total: files.length, onProgress
       })
-      const resp = await promise
-      if (resp.success) results.push(resp.data)
+      try {
+        const resp = await promise
+        results.push(resp.data)
+      } catch (error: any) {
+        failures.push({
+          filename: files[i].name,
+          error: error?.message || '上传失败'
+        })
+      }
     }
 
     // Token 模式上传后自动刷新配额
@@ -139,7 +159,7 @@ export const useUpload = () => {
       await tokenStore.verifyToken().catch(() => {})
     }
 
-    return results
+    return { results, failures }
   }
 
   return { uploadFiles, abortUpload }
