@@ -30,7 +30,7 @@ from tg_imagebed.database import (
     create_login_code,
     count_tokens_by_ip,
 )
-from tg_imagebed.utils import get_client_ip, validate_image_magic
+from tg_imagebed.utils import get_client_ip, get_domain, validate_image_magic
 from tg_imagebed.services.token_service import TokenService
 
 
@@ -208,6 +208,36 @@ class UploadLimitTests(unittest.TestCase):
         )
         with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}):
             self.assertEqual(get_client_ip(request), "203.0.113.1")
+
+    def test_domain_ignores_forwarded_headers_without_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={
+                "X-Forwarded-Host": "attacker.example",
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Prefix": "/attacker",
+            },
+            host="imagebed.example",
+            scheme="http",
+            script_root="",
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": ""}), \
+             patch("tg_imagebed.utils._get_effective_domain_settings", return_value=("", False)):
+            self.assertEqual(get_domain(request), "http://imagebed.example")
+
+    def test_domain_uses_proxyfix_values_from_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={},
+            host="public.example",
+            scheme="https",
+            script_root="/imagebed",
+            remote_addr="198.51.100.2",
+            environ={"werkzeug.proxy_fix.orig": {"REMOTE_ADDR": "198.51.100.2"}},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}), \
+             patch("tg_imagebed.utils._get_effective_domain_settings", return_value=("", False)):
+            self.assertEqual(get_domain(request), "https://public.example/imagebed")
 
     def test_web_verify_code_is_consumed_once(self):
         code = create_login_code("web_verify")

@@ -256,6 +256,13 @@ def get_client_ip(req) -> str:
     return '127.0.0.1'
 
 
+def _request_from_trusted_proxy(req) -> bool:
+    """判断请求是否经由配置的可信代理转发。"""
+    original_remote_addr = (getattr(req, 'environ', {}).get('werkzeug.proxy_fix.orig', {})
+                            .get('REMOTE_ADDR', req.remote_addr))
+    return is_trusted_proxy(original_remote_addr)
+
+
 # ===================== 加密工具 =====================
 def sign_file_id(file_id: str, file_path: str) -> str:
     """
@@ -488,36 +495,22 @@ def get_domain(request) -> str:
     cdn_mode = has_domain and cdn_enabled
 
     if request:
-        # 检测 Cloudflare 访问者信息
-        cf_visitor = request.headers.get('CF-Visitor')
-        if cf_visitor:
-            try:
-                import json
-                visitor_data = json.loads(cf_visitor)
-                scheme = visitor_data.get('scheme', 'https')
-            except Exception:
-                scheme = 'https'
-        else:
-            scheme = request.headers.get('X-Forwarded-Proto', 'http')
+        # ProxyFix 仅为可信代理规范化这些请求属性，不能直接读取转发头。
+        scheme = request.scheme
+        prefix = request.script_root if _request_from_trusted_proxy(request) else ''
 
-        # Host 选择：配置了域名则使用配置域名，否则使用请求 host
+        # Host 选择：配置了域名则使用配置域名，否则使用规范化后的请求 host
         if has_domain:
             host = configured_domain
         else:
-            host = (
-                request.headers.get('X-Forwarded-Host')
-                or request.headers.get('Host')
-                or request.host
-            )
+            host = request.host
 
         # Scheme 选择：CDN 模式强制 https，其他模式保持请求 scheme
         effective_scheme = 'https' if cdn_mode else scheme
         base_url = f"{effective_scheme}://{host}"
 
-        # 处理前缀
-        forwarded_prefix = request.headers.get('X-Forwarded-Prefix', '')
-        if forwarded_prefix:
-            base_url += forwarded_prefix.rstrip('/')
+        if prefix:
+            base_url += prefix.rstrip('/')
 
         return base_url
 
@@ -695,9 +688,9 @@ def get_image_domain(request=None, scene: str = '') -> str:
                         from .database.domains import build_domain_url
                         use_https = bool(d.get('use_https', 1))
                         base = build_domain_url(target_domain, d.get('port'), use_https)
-                        # 处理反向代理子路径前缀
+                        # 仅使用可信代理经 ProxyFix 规范化后的前缀。
                         if request:
-                            prefix = request.headers.get('X-Forwarded-Prefix', '')
+                            prefix = request.script_root if _request_from_trusted_proxy(request) else ''
                             if prefix:
                                 base += prefix.rstrip('/')
                         return base
@@ -707,9 +700,9 @@ def get_image_domain(request=None, scene: str = '') -> str:
     chosen = _random.choice(domains)
     use_https = bool(chosen.get('use_https', 1))
     base = build_domain_url(chosen['domain'], chosen.get('port'), use_https)
-    # 处理反向代理子路径前缀
+    # 仅使用可信代理经 ProxyFix 规范化后的前缀。
     if request:
-        prefix = request.headers.get('X-Forwarded-Prefix', '')
+        prefix = request.script_root if _request_from_trusted_proxy(request) else ''
         if prefix:
             base += prefix.rstrip('/')
     return base
