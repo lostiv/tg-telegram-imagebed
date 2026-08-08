@@ -17,7 +17,7 @@ from ..config import (
 from ..database import (
     get_file_info, update_access_count, update_cdn_cache_status,
     get_stats, get_recent_uploads, update_file_path_in_db,
-    get_system_setting, get_system_setting_int
+    get_system_setting, get_system_setting_int, get_connection
 )
 from ..utils import (
     VALID_IMAGE_MIME_TYPES, add_cache_headers, format_size, get_domain,
@@ -376,6 +376,32 @@ def get_info():
 @images_bp.route('/api/health')
 def health_check():
     """健康检查端点"""
+    checks = {}
+    try:
+        with get_connection() as conn:
+            result = conn.execute('PRAGMA quick_check').fetchone()[0]
+            if result != 'ok':
+                raise RuntimeError(f'SQLite quick_check failed: {result}')
+        checks['database'] = 'ok'
+
+        # 仅校验本地配置解析，不探测 Telegram 等外部依赖。
+        router = get_storage_router()
+        active_backend = router.get_active_backend_name()
+        if active_backend not in router.list_backends():
+            raise RuntimeError(f'active storage backend not configured: {active_backend}')
+        checks['storage'] = 'ok'
+    except Exception as e:
+        logger.error(f"健康检查失败: {e}")
+        response = jsonify({
+            'status': 'unhealthy',
+            'timestamp': int(time.time()),
+            'checks': checks,
+            'error': '基础依赖不可用',
+            'version': STATIC_VERSION
+        })
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return add_cache_headers(response, 'no-cache'), 503
+
     cdn_domain, cdn_enabled, cdn_mode = _get_domain_mode()
     cdn_redirect_enabled = str(get_system_setting('cdn_redirect_enabled') or '0') == '1'
 
@@ -387,6 +413,7 @@ def health_check():
         'cdn_mode': cdn_mode,
         'cloudflare_cdn': bool(cdn_domain),
         'cdn_redirect_enabled': cdn_redirect_enabled,
+        'checks': checks,
         'version': STATIC_VERSION
     })
     response.headers['Access-Control-Allow-Origin'] = '*'

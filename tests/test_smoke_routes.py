@@ -81,6 +81,12 @@ class FakeStorageRouter:
     def get_backend_for_record(self, file_info):
         return self.backend
 
+    def get_active_backend_name(self):
+        return self.backend.name
+
+    def list_backends(self):
+        return {self.backend.name: {}}
+
 
 class SmokeRouteTests(unittest.TestCase):
     def setUp(self):
@@ -142,6 +148,13 @@ class SmokeRouteTests(unittest.TestCase):
         self.assertEqual(image_response.status_code, 200)
         self.assertEqual(image_response.data, PNG_BYTES)
         self.assertEqual(image_response.mimetype, "image/png")
+
+    def test_health_check_returns_503_for_invalid_storage_config(self):
+        with patch.object(self.router, "list_backends", return_value={}):
+            response = self.client.get("/api/health")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.get_json()["status"], "unhealthy")
 
     def test_token_upload_full_flow(self):
         token_response = self.client.post(
