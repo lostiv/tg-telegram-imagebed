@@ -737,7 +737,7 @@ def set_default_upload_token(tg_user_id: int, token: str) -> bool:
 
 # ===================== Web 验证码登录（新流程） =====================
 
-@db_retry()
+@db_retry(max_attempts=3, base_delay=0.1, max_delay=2.0)
 def consume_web_verify_code(code: str, tg_user_id: int) -> Optional[str]:
     """Bot 端消费 web_verify 验证码
 
