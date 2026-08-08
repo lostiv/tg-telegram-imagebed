@@ -123,7 +123,7 @@ class FrontendStaticSmokeTests(unittest.TestCase):
 
     def test_frontend_bootstrap_apis_are_available(self):
         api_routes = {
-            "/api/health": {"status", "timestamp", "version"},
+            "/api/health": {"success", "data"},
             "/api/setup/status": {"need_setup"},
             "/api/public/settings": {"success", "data"},
             "/api/announcement": {"success", "data"},

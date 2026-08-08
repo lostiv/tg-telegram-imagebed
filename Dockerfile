@@ -1,5 +1,5 @@
 # ==================== 阶段1: 构建前端 ====================
-FROM node:20-alpine AS frontend-builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-builder
 
 # 设置工作目录
 WORKDIR /frontend
@@ -27,14 +27,13 @@ RUN if [ -f .output/public/index.html ]; then \
     fi
 
 # ==================== 阶段2: 构建最终镜像 ====================
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
 
 # 设置工作目录
 WORKDIR /app
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
-    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
