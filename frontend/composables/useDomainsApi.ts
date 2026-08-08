@@ -28,11 +28,12 @@ export interface AddDomainData {
 
 export function useDomainsApi() {
   const config = useRuntimeConfig()
+  const { $apiFetch } = useNuxtApp()
   const apiBase = config.public.apiBase || ''
 
   // 获取所有域名（管理员）
   const getDomains = async (): Promise<DomainItem[]> => {
-    const res = await $fetch<any>(`${apiBase}/api/admin/domains`, {
+    const res = await $apiFetch<any>(`${apiBase}/api/admin/domains`, {
       credentials: 'include'
     })
     if (res.success) return res.data || []
@@ -41,7 +42,7 @@ export function useDomainsApi() {
 
   // 添加域名
   const addDomain = async (data: AddDomainData) => {
-    const res = await $fetch<any>(`${apiBase}/api/admin/domains`, {
+    const res = await $apiFetch<any>(`${apiBase}/api/admin/domains`, {
       method: 'POST',
       credentials: 'include',
       body: data
@@ -52,7 +53,7 @@ export function useDomainsApi() {
 
   // 更新域名
   const updateDomain = async (id: number, data: Partial<AddDomainData & { is_active: boolean; port: number | null }>) => {
-    const res = await $fetch<any>(`${apiBase}/api/admin/domains/${id}`, {
+    const res = await $apiFetch<any>(`${apiBase}/api/admin/domains/${id}`, {
       method: 'PUT',
       credentials: 'include',
       body: data
@@ -63,7 +64,7 @@ export function useDomainsApi() {
 
   // 删除域名
   const deleteDomain = async (id: number) => {
-    const res = await $fetch<any>(`${apiBase}/api/admin/domains/${id}`, {
+    const res = await $apiFetch<any>(`${apiBase}/api/admin/domains/${id}`, {
       method: 'DELETE',
       credentials: 'include'
     })
@@ -73,7 +74,7 @@ export function useDomainsApi() {
 
   // 设为默认域名
   const setDefaultDomain = async (id: number) => {
-    const res = await $fetch<any>(`${apiBase}/api/admin/domains/${id}/set-default`, {
+    const res = await $apiFetch<any>(`${apiBase}/api/admin/domains/${id}/set-default`, {
       method: 'PUT',
       credentials: 'include'
     })

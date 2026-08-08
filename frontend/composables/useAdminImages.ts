@@ -222,7 +222,8 @@ export const useAdminImages = () => {
 
   const loadSyncDeleteSetting = async () => {
     try {
-      const resp = await $fetch<any>(`${runtimeConfig.public.apiBase}/api/admin/system/settings`, {
+      const { $apiFetch } = useNuxtApp()
+      const resp = await $apiFetch<any>(`${runtimeConfig.public.apiBase}/api/admin/system/settings`, {
         credentials: 'include',
       })
       if (resp?.success) {
