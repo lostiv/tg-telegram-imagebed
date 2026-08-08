@@ -48,6 +48,8 @@ cd tg-telegram-imagebed
 docker compose up -d --build
 ```
 
+容器使用 UID/GID `10001` 运行。首次使用 bind mount 前，请确保宿主机数据目录可由该用户写入：`mkdir -p data && chown -R 10001:10001 data`。
+
 默认仅绑定本机回环地址 `127.0.0.1:18793`，启动后访问：
 
 ```text

@@ -110,7 +110,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 关闭分享
   const disableShare = async (galleryId: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
       method: 'DELETE',
       ...getFetchOptions()
     })
@@ -120,7 +120,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 设置画集封面
   const setCover = async (galleryId: number, encryptedId: string) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
       method: 'PUT',
       ...getFetchOptions(),
       body: { encrypted_id: encryptedId }
@@ -131,7 +131,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 清除画集封面
   const clearCover = async (galleryId: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
       method: 'DELETE',
       ...getFetchOptions()
     })
