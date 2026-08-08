@@ -26,6 +26,8 @@ from tg_imagebed.database import (
     update_system_setting,
     upsert_tg_user,
     create_tg_session,
+    consume_web_verify_code,
+    create_login_code,
     count_tokens_by_ip,
 )
 from tg_imagebed.utils import get_client_ip, validate_image_magic
@@ -206,6 +208,30 @@ class UploadLimitTests(unittest.TestCase):
         )
         with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}):
             self.assertEqual(get_client_ip(request), "203.0.113.1")
+
+    def test_web_verify_code_is_consumed_once(self):
+        code = create_login_code("web_verify")
+        self.assertIsNotNone(code)
+
+        results = []
+        barrier = threading.Barrier(2)
+
+        def worker():
+            barrier.wait()
+            results.append(consume_web_verify_code(code, 1001))
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        successful_sessions = [session for session in results if session]
+        self.assertEqual(len(successful_sessions), 1)
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM tg_sessions")
+            self.assertEqual(cursor.fetchone()[0], 1)
 
     def test_delete_token_with_images_succeeds_when_external_cleanup_fails(self):
         token = create_auth_token(
