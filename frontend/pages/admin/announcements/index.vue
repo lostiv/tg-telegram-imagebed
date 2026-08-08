@@ -147,7 +147,7 @@
                 <p class="text-sm font-medium text-stone-900 dark:text-white">实时预览</p>
               </div>
               <div class="mt-3 min-h-[280px] max-h-[520px] overflow-y-auto rounded-xl border border-dashed border-stone-300 bg-stone-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/70">
-                <div v-if="announcement.content.trim()" class="announcement-preview-content whitespace-pre-wrap text-sm">{{ announcement.content }}</div>
+                <div v-if="announcement.content.trim()" class="announcement-preview-content whitespace-pre-wrap wrap-break-word text-sm">{{ announcement.content }}</div>
                 <div v-else class="flex min-h-[180px] items-center justify-center text-sm text-stone-400 dark:text-stone-500">
                   暂无公告内容，先在左侧输入文案
                 </div>

@@ -27,7 +27,7 @@
 
       <div class="max-h-[62vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div v-if="announcement.content.trim()" class="announcement-content-shell">
-          <div class="announcement-modal-content whitespace-pre-wrap text-sm sm:text-base">{{ announcement.content }}</div>
+          <div class="announcement-modal-content whitespace-pre-wrap wrap-break-word text-sm sm:text-base">{{ announcement.content }}</div>
         </div>
         <div v-else class="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 text-sm text-stone-500 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-stone-400">
           暂无公告内容
