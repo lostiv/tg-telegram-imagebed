@@ -48,11 +48,15 @@ cd tg-telegram-imagebed
 docker compose up -d --build
 ```
 
-默认对外端口是 `18793`，启动后访问：
+容器使用 UID/GID `10001` 运行。首次使用 bind mount 前，请确保宿主机数据目录可由该用户写入：`mkdir -p data && chown -R 10001:10001 data`。
+
+默认仅绑定本机回环地址 `127.0.0.1:18793`，启动后访问：
 
 ```text
 http://127.0.0.1:18793
 ```
+
+生产环境请通过 Nginx、Caddy 或 Ingress 反向代理发布服务，并在代理层配置 TLS、访问控制和正确的转发头。若必须直接暴露端口，请自行配置防火墙和 HTTPS；不要将未加防护的 Waitress 端口暴露到公网。
 
 首次进入会进入管理员初始化流程。完成后按下面顺序配置最稳：
 
@@ -61,6 +65,8 @@ http://127.0.0.1:18793
 3. 填入 `Bot Token` 和目标 `chat_id`。
 4. 如果你要稳定处理 `20 MB+` 图片，顺手把 `API ID`、`API Hash` 也补上。
 5. 按需配置游客上传策略、Token、TG 认证、CDN、画集站点等。
+
+Token Vault 会将用于续传上传权限的 Token 保存在浏览器 localStorage 中。该存储并非安全隔离，任何成功运行的同源脚本均可读取 Token；请保持前端依赖可信、及时修复 XSS，并避免在不可信浏览器或共享设备上保存 Token。
 
 ### 方式二：本地手动运行
 

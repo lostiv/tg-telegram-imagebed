@@ -225,6 +225,11 @@ def create_app() -> Flask:
         """
         _apply_request_limit()
 
+    @app.after_request
+    def _set_security_headers(response):
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        return response
+
     @app.errorhandler(RequestEntityTooLarge)
     def handle_request_entity_too_large(error):
         """统一返回更清晰的上传过大错误"""

@@ -341,16 +341,23 @@ const handleFiles = async (files: File[]) => {
   uploadProgress.value = { label: `准备上传 ${validFiles.length} 张图片...`, percent: 0 }
 
   try {
-    const results = await uploadFiles(validFiles, (p) => {
+    const { results, failures } = await uploadFiles(validFiles, (p) => {
       uploadProgress.value = p
     })
-    uploadProgress.value = { label: '上传完成', percent: 100 }
+    uploadProgress.value = { label: failures.length ? '上传部分完成' : '上传完成', percent: 100 }
     lastUploadCount.value = results.length
-    toast.success('上传成功', `成功上传 ${results.length} 张图片`)
-    triggerStatsRefresh()
-    emit('uploaded', results)
+    if (results.length > 0) {
+      toast.success('上传成功', `成功上传 ${results.length} 张图片`)
+      triggerStatsRefresh()
+      emit('uploaded', results)
+    }
+    if (failures.length > 0) {
+      const details = failures.map(item => `${item.filename}: ${item.error}`).join('；')
+      lastErrorMessage.value = details
+      toast.error('部分图片上传失败', details)
+    }
     uploading.value = false
-    uploadPhase.value = 'success'
+    uploadPhase.value = results.length > 0 ? 'success' : 'error'
     scheduleIdle(720)
   } catch (error: any) {
     const message = error?.data?.error || error?.message || '未知错误'

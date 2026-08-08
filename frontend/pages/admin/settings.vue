@@ -2141,7 +2141,7 @@ const openGallerySiteAdmin = async () => {
     if (tokenRes?.success && tokenRes.data?.token) {
       url += `/gallery-site/admin?auth_token=${tokenRes.data.token}`
     }
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   } catch (e: any) {
     notification.error('操作失败', e.message || '无法打开画集站点')
   } finally {

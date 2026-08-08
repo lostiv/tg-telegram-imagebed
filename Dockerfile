@@ -44,9 +44,6 @@ COPY requirements.txt .
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 创建必要的目录结构
-RUN mkdir -p /app/data
-
 # 复制后端代码（根目录仅 main.py，其余都在 tg_imagebed 包内）
 COPY VERSION .
 COPY main.py .
@@ -55,10 +52,18 @@ COPY tg_imagebed/ ./tg_imagebed/
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /frontend/.output/public /app/frontend/.output/public
 
+# 使用无特权用户运行，数据目录也归该用户所有。
+RUN groupadd --system --gid 10001 appuser \
+    && useradd --system --uid 10001 --gid appuser --home-dir /app --no-create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/data \
+    && chown -R appuser:appuser /app
+
 # 暴露端口
 EXPOSE 18793
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
+
+USER appuser
 
 CMD ["python", "main.py"]

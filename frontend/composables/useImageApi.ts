@@ -6,6 +6,7 @@ import type {
 
 export const useImageApi = () => {
   const config = useRuntimeConfig()
+  const { $apiFetch } = useNuxtApp()
   const baseURL = config.public.apiBase
   const getStats = async (): Promise<PublicStats> => {
     try {
@@ -20,7 +21,7 @@ export const useImageApi = () => {
   // 获取管理员统计信息
   const getAdminStats = async (): Promise<AdminStatsData> => {
     try {
-      const response = await $fetch<ApiResponse<AdminStatsData>>('/api/admin/stats', {
+      const response = await $apiFetch<ApiResponse<AdminStatsData>>('/api/admin/stats', {
         credentials: 'include'
       })
       return response.data || { stats: {} as any, config: {} as any }
@@ -33,7 +34,7 @@ export const useImageApi = () => {
   // 获取图片列表
   const getImages = async (params: AdminImagesQuery): Promise<AdminImagesData> => {
     try {
-      const response = await $fetch<ApiResponse<AdminImagesData>>('/api/admin/images', {
+      const response = await $apiFetch<ApiResponse<AdminImagesData>>('/api/admin/images', {
         params,
         credentials: 'include'
       })
@@ -51,7 +52,7 @@ export const useImageApi = () => {
       if (opts?.deleteStorage !== undefined) {
         body.delete_storage = opts.deleteStorage
       }
-      const response = await $fetch<ApiResponse<AdminDeleteData>>('/api/admin/delete', {
+      const response = await $apiFetch<ApiResponse<AdminDeleteData>>('/api/admin/delete', {
         method: 'POST',
         body,
         credentials: 'include'
@@ -66,7 +67,7 @@ export const useImageApi = () => {
   // 清理缓存
   const clearCache = async () => {
     try {
-      const response = await $fetch<ApiResponse>('/api/admin/clear-cache', {
+      const response = await $apiFetch<ApiResponse>('/api/admin/clear-cache', {
         method: 'POST',
         credentials: 'include'
       })
@@ -84,7 +85,7 @@ export const useImageApi = () => {
     limit?: number
   }): Promise<AdminDashboardActivityData> => {
     try {
-      const response = await $fetch<ApiResponse<AdminDashboardActivityData>>('/api/admin/dashboard/activity', {
+      const response = await $apiFetch<ApiResponse<AdminDashboardActivityData>>('/api/admin/dashboard/activity', {
         params,
         credentials: 'include'
       })

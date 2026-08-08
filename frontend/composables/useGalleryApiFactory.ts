@@ -11,10 +11,12 @@ export interface GalleryApiFetchOptions {
 export function createGalleryApi(baseUrl: string, getFetchOptions: () => GalleryApiFetchOptions) {
   const config = useRuntimeConfig()
   const apiBase = config.public.apiBase
+  const { $apiFetch } = useNuxtApp()
+  const apiFetch = baseUrl.startsWith('/api/admin/') ? $apiFetch : $fetch
 
   // 获取画集列表
   const getGalleries = async (page = 1, limit = 50) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}`, {
       params: { page, limit },
       ...getFetchOptions()
     })
@@ -24,7 +26,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 创建画集
   const createGallery = async (name: string, description?: string) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}`, {
       method: 'POST',
       ...getFetchOptions(),
       body: { name, description }
@@ -35,7 +37,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 获取画集详情
   const getGallery = async (id: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
       ...getFetchOptions()
     })
     if (!response?.success) throw new Error(response?.error || '获取画集失败')
@@ -44,7 +46,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 更新画集
   const updateGallery = async (id: number, data: Partial<Gallery>) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
       method: 'PATCH',
       ...getFetchOptions(),
       body: data
@@ -55,7 +57,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 删除画集
   const deleteGallery = async (id: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${id}`, {
       method: 'DELETE',
       ...getFetchOptions()
     })
@@ -65,7 +67,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 获取画集图片
   const getGalleryImages = async (galleryId: number, page = 1, limit = 50) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
       params: { page, limit },
       ...getFetchOptions()
     })
@@ -75,7 +77,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 添加图片到画集
   const addImagesToGallery = async (galleryId: number, encryptedIds: string[]) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
       method: 'POST',
       ...getFetchOptions(),
       body: { encrypted_ids: encryptedIds }
@@ -86,7 +88,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 从画集移除图片
   const removeImagesFromGallery = async (galleryId: number, encryptedIds: string[]) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/images`, {
       method: 'DELETE',
       ...getFetchOptions(),
       body: { encrypted_ids: encryptedIds }
@@ -97,7 +99,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 开启/更新分享
   const enableShare = async (galleryId: number, expiresAt?: string) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
       method: 'POST',
       ...getFetchOptions(),
       body: { enabled: true, expires_at: expiresAt }
@@ -108,7 +110,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 关闭分享
   const disableShare = async (galleryId: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/share`, {
       method: 'DELETE',
       ...getFetchOptions()
     })
@@ -118,7 +120,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 设置画集封面
   const setCover = async (galleryId: number, encryptedId: string) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
       method: 'PUT',
       ...getFetchOptions(),
       body: { encrypted_id: encryptedId }
@@ -129,7 +131,7 @@ export function createGalleryApi(baseUrl: string, getFetchOptions: () => Gallery
 
   // 清除画集封面
   const clearCover = async (galleryId: number) => {
-    const response = await $fetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
+    const response = await apiFetch<ApiResponse>(`${apiBase}${baseUrl}/${galleryId}/cover`, {
       method: 'DELETE',
       ...getFetchOptions()
     })
