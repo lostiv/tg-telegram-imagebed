@@ -359,6 +359,13 @@ def token_profile_api():
 
     # DELETE: 用户侧删除 Token（级联删除，可选同时删除图片）
     if request.method == 'DELETE':
+        verification = verify_auth_token_access(token)
+        if not verification['valid']:
+            return add_cache_headers(jsonify({'success': False, 'error': f"Token无效: {verification['reason']}"}), 'no-cache'), 401
+        issue = get_bound_token_session_issue(verification.get('token_data'))
+        if issue:
+            return add_cache_headers(jsonify({'success': False, 'error': issue['reason']}), 'no-cache'), issue['status']
+
         from ..services.token_service import TokenService
         delete_images = request.args.get('delete_images', '').lower() in ('true', '1')
         deleted = TokenService.delete_token_by_string(token, delete_images=delete_images)
