@@ -8,10 +8,10 @@ const LEGACY_IS_GUEST_KEY = 'is_guest'
 
 const nowIso = () => new Date().toISOString()
 
-// ── Token 编解码（base64，防止明文存储）──────────────────────
+// ── Token 编解码（仅兼容历史存储格式）────────────────────────
 /**
- * 编码：base64 编码
- * 存储格式：'b64:' 前缀 + base64 字符串
+ * Token 必须保存在 localStorage 以支持刷新后继续使用；base64 不是加密，
+ * 同源脚本可读取并重放 Token，因此部署方必须防范 XSS 和不可信第三方脚本。
  */
 const obfuscateToken = (token: string): string => {
   if (!token) return token
@@ -123,7 +123,7 @@ export const useTokenStore = defineStore('token', {
   actions: {
     persistVault() {
       if (!import.meta.client) return
-      // 存储前对每个 token 做混淆处理
+      // base64 仅为兼容既有存储格式，不提供保密性。
       const vaultToStore = {
         ...this.vault,
         items: this.vault.items.map(i => ({
