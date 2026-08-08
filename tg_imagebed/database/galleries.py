@@ -460,6 +460,7 @@ def get_share_all_galleries(share_token: str, page: int = 1, limit: int = 50) ->
                        )) AS cover_image
                 FROM galleries g
                 WHERE g.hide_from_share_all = 0
+                  AND g.access_mode != 'admin_only'
                 ORDER BY g.updated_at DESC
                 LIMIT ? OFFSET ?
             ''', (limit, offset))
@@ -469,6 +470,7 @@ def get_share_all_galleries(share_token: str, page: int = 1, limit: int = 50) ->
             cursor.execute('''
                 SELECT COUNT(*) FROM galleries
                 WHERE hide_from_share_all = 0
+                  AND access_mode != 'admin_only'
             ''')
             total = cursor.fetchone()[0]
 
@@ -494,7 +496,9 @@ def _validate_share_all_token(cursor, share_token: str) -> bool:
     return cursor.fetchone() is not None
 
 
-def get_share_all_gallery(share_token: str, gallery_id: int) -> Optional[Dict[str, Any]]:
+def get_share_all_gallery(
+    share_token: str, gallery_id: int, include_admin_only: bool = False
+) -> Optional[Dict[str, Any]]:
     """在全部分享上下文中获取单个画集信息（不含图片）"""
     try:
         with get_connection() as conn:
@@ -511,8 +515,9 @@ def get_share_all_gallery(share_token: str, gallery_id: int) -> Optional[Dict[st
                 FROM galleries g
                 WHERE g.id = ?
                   AND g.hide_from_share_all = 0
+                  AND (? = 1 OR g.access_mode != 'admin_only')
                 LIMIT 1
-            ''', (gallery_id,))
+            ''', (gallery_id, int(include_admin_only)))
             row = cursor.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -524,7 +529,8 @@ def get_share_all_gallery_images(
     share_token: str,
     gallery_id: int,
     page: int = 1,
-    limit: int = 50
+    limit: int = 50,
+    include_admin_only: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """在全部分享上下文中获取画集图片（不检查解锁 cookie，由 API 层处理）"""
     page = max(1, int(page or 1))
@@ -540,8 +546,9 @@ def get_share_all_gallery_images(
                 SELECT 1 FROM galleries
                 WHERE id = ?
                   AND hide_from_share_all = 0
+                  AND (? = 1 OR access_mode != 'admin_only')
                 LIMIT 1
-            ''', (gallery_id,))
+            ''', (gallery_id, int(include_admin_only)))
             if not cursor.fetchone():
                 return None
 

@@ -231,7 +231,7 @@ async def handle_photo(update: Update, context):
     """处理图片上传（私聊/群组/频道）"""
     from ..services.file_service import process_upload, record_existing_telegram_file
     from ..utils import get_domain, get_image_domain, get_mime_type as _get_mime_type
-    from ..database import get_system_setting, has_bound_tokens
+    from ..database import get_system_setting, get_system_setting_int, has_bound_tokens
     from ..database import get_active_user_tokens, get_default_upload_token
 
     message = update.effective_message
@@ -299,6 +299,14 @@ async def handle_photo(update: Update, context):
                     pass
             return
 
+        max_size_mb = get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+        max_size_bytes = max_size_mb * 1024 * 1024
+        file_size = getattr(tg_file, 'file_size', 0) or 0
+        if file_size > max_size_bytes:
+            if status_msg:
+                await status_msg.edit_text(f"❌ 文件大小超过 {max_size_mb}MB 限制")
+            return
+
         # Caption 自定义文件名
         if message.caption and str(get_system_setting('bot_caption_filename_enabled') or '1') == '1':
             from .commands import _sanitize_filename
@@ -329,6 +337,7 @@ async def handle_photo(update: Update, context):
                 "file_unique_id": file_unique_id,
                 "filename": filename,
                 "content_type": content_type,
+                "file_size": file_size,
                 "message_id": message.message_id,
                 "username": username,
                 "tg_user_id": tg_user_id,

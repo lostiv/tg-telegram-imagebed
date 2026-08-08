@@ -114,7 +114,7 @@
         <AdminAnnouncementSectionCard
           :id="sectionDomId('editor')"
           title="内容编辑与预览"
-          description="左侧编辑 HTML 公告内容，右侧实时预览"
+          description="左侧编辑公告内容，右侧实时预览"
           icon="heroicons:pencil-square"
           :dirty="Boolean(dirtyMap.editor)"
           :saving="Boolean(sectionSaving.editor)"
@@ -125,19 +125,18 @@
             <div class="rounded-2xl border border-stone-200/80 bg-white/90 p-4 dark:border-neutral-700/80 dark:bg-neutral-900/70">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
-                  <UIcon name="heroicons:code-bracket-square" class="h-4 w-4 text-amber-500" />
-                  <p class="text-sm font-medium text-stone-900 dark:text-white">HTML 编辑器</p>
+                  <UIcon name="heroicons:pencil-square" class="h-4 w-4 text-amber-500" />
+                  <p class="text-sm font-medium text-stone-900 dark:text-white">公告编辑器</p>
                 </div>
-                <p class="text-xs text-stone-500 dark:text-stone-400">支持 HTML 标签</p>
+                <p class="text-xs text-stone-500 dark:text-stone-400">纯文本显示</p>
               </div>
               <UTextarea
                 v-model="announcement.content"
                 :rows="16"
-                placeholder="请输入公告内容，支持 HTML..."
-                class="mt-3 font-mono text-sm"
+                placeholder="请输入公告内容..."
+                class="mt-3 text-sm"
               />
               <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500 dark:text-stone-400">
-                <p>可用标签：&lt;strong&gt;、&lt;p&gt;、&lt;ul&gt;、&lt;a&gt;</p>
                 <p>字符数：{{ contentLength }}</p>
               </div>
             </div>
@@ -148,11 +147,7 @@
                 <p class="text-sm font-medium text-stone-900 dark:text-white">实时预览</p>
               </div>
               <div class="mt-3 min-h-[280px] max-h-[520px] overflow-y-auto rounded-xl border border-dashed border-stone-300 bg-stone-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/70">
-                <div
-                  v-if="announcement.content.trim()"
-                  class="announcement-preview-content prose max-w-none text-sm dark:prose-invert"
-                  v-html="announcement.content"
-                />
+                <div v-if="announcement.content.trim()" class="announcement-preview-content whitespace-pre-wrap wrap-break-word text-sm">{{ announcement.content }}</div>
                 <div v-else class="flex min-h-[180px] items-center justify-center text-sm text-stone-400 dark:text-stone-500">
                   暂无公告内容，先在左侧输入文案
                 </div>
@@ -275,37 +270,33 @@ const announcementTemplates: AnnouncementTemplate[] = [
   {
     name: '欢迎公告',
     description: '介绍站点特性与上传优势',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-stone-900 dark:text-white">欢迎来到花语阁图床</h3>
-  <p class="text-stone-700 dark:text-stone-300">支持游客上传、Token 管理和画集分享，图片链接可长期访问。</p>
-  <ul class="list-disc space-y-1 pl-5 text-stone-700 dark:text-stone-300">
-    <li>上传流程简洁，支持批量与拖拽</li>
-    <li>画集页面支持公开分享与封面展示</li>
-    <li>后台可灵活管理存储、路由与访问策略</li>
-  </ul>
-</div>`,
+    content: `欢迎来到花语阁图床
+
+支持游客上传、Token 管理和画集分享，图片链接可长期访问。
+
+- 上传流程简洁，支持批量与拖拽
+- 画集页面支持公开分享与封面展示
+- 后台可灵活管理存储、路由与访问策略`,
   },
   {
     name: '维护通知',
     description: '系统维护窗口提醒',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-rose-600 dark:text-rose-400">系统维护通知</h3>
-  <p class="text-stone-700 dark:text-stone-300">为了提升稳定性，系统将在维护窗口进行升级，期间可能出现短时上传延迟。</p>
-  <p class="text-stone-700 dark:text-stone-300">建议提前完成关键上传任务，维护完成后会第一时间恢复全部能力。</p>
-</div>`,
+    content: `系统维护通知
+
+为了提升稳定性，系统将在维护窗口进行升级，期间可能出现短时上传延迟。
+
+建议提前完成关键上传任务，维护完成后会第一时间恢复全部能力。`,
   },
   {
     name: '功能更新',
     description: '发布新版功能亮点',
-    content: `<div class="space-y-3">
-  <h3 class="text-lg font-bold text-blue-600 dark:text-blue-400">功能更新已上线</h3>
-  <p class="text-stone-700 dark:text-stone-300">本次更新包含以下内容：</p>
-  <ul class="list-disc space-y-1 pl-5 text-stone-700 dark:text-stone-300">
-    <li>画集首页展示机制优化，信息密度更高</li>
-    <li>后台管理界面重构，移动端交互更友好</li>
-    <li>Token 与登录链路稳定性提升</li>
-  </ul>
-</div>`,
+    content: `功能更新已上线
+
+本次更新包含以下内容：
+
+- 画集首页展示机制优化，信息密度更高
+- 后台管理界面重构，移动端交互更友好
+- Token 与登录链路稳定性提升`,
   },
 ]
 
@@ -347,9 +338,9 @@ const formatDate = (dateString: string | null) => {
   })
 }
 
-const extractTemplateSummary = (html: string): string => {
-  const plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return plain.slice(0, 70) + (plain.length > 70 ? '...' : '')
+const extractTemplateSummary = (content: string): string => {
+  const firstLine = content.split('\n').find(line => line.trim())?.trim() || ''
+  return firstLine.slice(0, 70) + (firstLine.length > 70 ? '...' : '')
 }
 
 const canSaveCurrentState = (): boolean => {

@@ -13,8 +13,11 @@ from typing import Optional, Dict, Any
 import requests
 
 from ..config import logger
-from ..database import save_file_info, get_file_info, update_file_path_in_db, release_upload_reservation
-from ..utils import sign_file_id, get_mime_type
+from ..database import (
+    save_file_info, get_file_info, update_file_path_in_db, release_upload_reservation,
+    get_system_setting_int,
+)
+from ..utils import sign_file_id, get_mime_type, validate_image_magic
 from .cdn_service import add_to_cdn_monitor
 from ..storage.router import get_storage_router
 from ..bot_control import get_effective_bot_token
@@ -111,6 +114,18 @@ def process_upload(
         file_size = os.path.getsize(staged_file_path)
     else:
         file_size = len(file_content or b'')
+
+    max_size_mb = get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+    if file_size > max_size_mb * 1024 * 1024:
+        logger.warning("拒绝超过大小限制的上传: %s", filename)
+        return None
+
+    if file_content is not None:
+        detected_mime = validate_image_magic(file_content)
+        if not detected_mime:
+            logger.warning("拒绝无效图片上传: %s", filename)
+            return None
+        content_type = detected_mime
 
     # 规范化 content_type（防止 None 或空字符串导致后端出错）
     if not content_type:
@@ -270,15 +285,22 @@ def record_existing_telegram_file(
     if not file_id:
         return None
 
+    detected_mime = validate_image_magic(file_content or b'')
+    if not detected_mime:
+        logger.warning("拒绝无效 Telegram 图片: %s", filename)
+        return None
+
     file_path = file_path or ''
     file_size = len(file_content or b'')
 
-    if not content_type:
-        content_type = get_mime_type(filename)
+    max_size_mb = get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+    if file_size > max_size_mb * 1024 * 1024:
+        logger.warning("拒绝超过大小限制的 Telegram 图片: %s", filename)
+        return None
 
     file_hash = hashlib.sha256(file_content or b'').hexdigest()
     encrypted_id = sign_file_id(file_id, file_path)
-    mime_type = get_mime_type(filename)
+    mime_type = detected_mime
     upload_time = int(time.time())
 
     file_data = {

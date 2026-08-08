@@ -234,6 +234,56 @@ class SmokeRouteTests(unittest.TestCase):
         self.assertEqual(response.data, b"")
         get_backend.assert_not_called()
 
+    def test_head_image_rejects_legacy_svg_mime_type(self):
+        upload_response = self._upload_png("/api/upload")
+        self.assertEqual(upload_response.status_code, 200)
+        encrypted_id = upload_response.get_json()["data"]["url"].rsplit("/", 1)[-1]
+
+        from tg_imagebed.database import get_connection
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE file_storage SET mime_type = ? WHERE encrypted_id = ?",
+                ("image/svg+xml", encrypted_id),
+            )
+
+        response = self.client.head(f"/image/{encrypted_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/octet-stream")
+
+    def test_share_all_hides_admin_only_gallery(self):
+        from tg_imagebed.database import get_connection
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO share_all_links (share_token, enabled) VALUES (?, 1)",
+                ("share-all-test",),
+            )
+            cursor.execute(
+                "INSERT INTO galleries (name, access_mode, hide_from_share_all) VALUES (?, ?, 0)",
+                ("仅管理员", "admin_only"),
+            )
+            gallery_id = cursor.lastrowid
+
+        list_response = self.client.get("/api/shared/all/share-all-test")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.get_json()["data"]["total"], 0)
+
+        detail_response = self.client.get(
+            f"/api/shared/all/share-all-test/galleries/{gallery_id}"
+        )
+        self.assertEqual(detail_response.status_code, 404)
+
+        with self.client.session_transaction() as session:
+            session["admin_logged_in"] = True
+            session["admin_username"] = "admin"
+            session["admin_token"] = "admin-smoke-token"
+
+        admin_detail_response = self.client.get(
+            f"/api/shared/all/share-all-test/galleries/{gallery_id}"
+        )
+        self.assertEqual(admin_detail_response.status_code, 200)
+
     def test_delete_referenced_storage_backend_is_blocked(self):
         upload_response = self._upload_png("/api/upload")
         self.assertEqual(upload_response.status_code, 200)

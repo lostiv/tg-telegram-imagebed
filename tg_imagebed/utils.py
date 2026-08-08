@@ -107,6 +107,70 @@ LOCAL_IP = get_local_ip()
 
 
 # ===================== 客户端 IP 解析 =====================
+IMAGE_SIGNATURES = {
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"\xff\xd8\xff": "image/jpeg",
+    b"GIF87a": "image/gif",
+    b"GIF89a": "image/gif",
+    b"RIFF": "image/webp",
+    b"BM": "image/bmp",
+    b"\x49\x49\x2A\x00": "image/tiff",
+    b"\x4D\x4D\x00\x2A": "image/tiff",
+    b"\x00\x00\x01\x00": "image/x-icon",
+}
+VALID_IMAGE_MIME_TYPES = frozenset(IMAGE_SIGNATURES.values()) | {
+    "image/avif", "image/heic"
+}
+
+
+def is_trusted_proxy(remote_addr: str) -> bool:
+    """检查连接对端是否在 TRUSTED_PROXY 配置的 IP 或网段中。"""
+    raw_proxies = os.environ.get('TRUSTED_PROXY', '')
+    remote_ip = _normalize_ip_candidate(remote_addr)
+    if not raw_proxies or not remote_ip:
+        return False
+
+    address = ipaddress.ip_address(remote_ip)
+    for value in raw_proxies.split(','):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            if address in ipaddress.ip_network(value, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def validate_image_magic(content: bytes) -> Optional[str]:
+    """根据文件魔数识别允许的图片格式。"""
+    if len(content) < 12:
+        return None
+
+    for signature, mime_type in IMAGE_SIGNATURES.items():
+        if not content.startswith(signature):
+            continue
+        if signature == b"RIFF" and content[8:12] != b"WEBP":
+            continue
+        return mime_type
+
+    if content[4:8] == b"ftyp":
+        major_brand = content[8:12]
+        if major_brand in (b"avif", b"avis"):
+            return "image/avif"
+        if major_brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+            return "image/heic"
+        compat_region = content[16:min(64, len(content))]
+        for i in range(0, len(compat_region) - 3, 4):
+            brand = compat_region[i:i + 4]
+            if brand in (b"avif", b"avis"):
+                return "image/avif"
+            if brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"):
+                return "image/heic"
+    return None
+
+
 def _normalize_ip_candidate(raw_value: str) -> Optional[str]:
     """将请求头中的 IP 候选值规范化为可用 IP 字符串，失败返回 None"""
     value = str(raw_value or '').strip()
@@ -144,7 +208,7 @@ def _normalize_ip_candidate(raw_value: str) -> Optional[str]:
 
 def get_client_ip(req) -> str:
     """
-    提取真实客户端 IP（兼容 Cloudflare + 反向代理）
+    提取真实客户端 IP；仅信任可信代理发送的转发头。
 
     优先级：
     1. CF-Connecting-IP / True-Client-IP（Cloudflare）
@@ -153,6 +217,11 @@ def get_client_ip(req) -> str:
     4. X-Real-IP
     5. remote_addr
     """
+    original_remote_addr = (getattr(req, 'environ', {}).get('werkzeug.proxy_fix.orig', {})
+                            .get('REMOTE_ADDR', req.remote_addr))
+    if not is_trusted_proxy(original_remote_addr):
+        return _normalize_ip_candidate(req.remote_addr) or str(req.remote_addr or '')
+
     for header_name in ('CF-Connecting-IP', 'True-Client-IP'):
         normalized = _normalize_ip_candidate(req.headers.get(header_name))
         if normalized:
@@ -185,6 +254,13 @@ def get_client_ip(req) -> str:
         return normalized
 
     return '127.0.0.1'
+
+
+def _request_from_trusted_proxy(req) -> bool:
+    """判断请求是否经由配置的可信代理转发。"""
+    original_remote_addr = (getattr(req, 'environ', {}).get('werkzeug.proxy_fix.orig', {})
+                            .get('REMOTE_ADDR', req.remote_addr))
+    return is_trusted_proxy(original_remote_addr)
 
 
 # ===================== 加密工具 =====================
@@ -419,36 +495,22 @@ def get_domain(request) -> str:
     cdn_mode = has_domain and cdn_enabled
 
     if request:
-        # 检测 Cloudflare 访问者信息
-        cf_visitor = request.headers.get('CF-Visitor')
-        if cf_visitor:
-            try:
-                import json
-                visitor_data = json.loads(cf_visitor)
-                scheme = visitor_data.get('scheme', 'https')
-            except Exception:
-                scheme = 'https'
-        else:
-            scheme = request.headers.get('X-Forwarded-Proto', 'http')
+        # ProxyFix 仅为可信代理规范化这些请求属性，不能直接读取转发头。
+        scheme = request.scheme
+        prefix = request.script_root if _request_from_trusted_proxy(request) else ''
 
-        # Host 选择：配置了域名则使用配置域名，否则使用请求 host
+        # Host 选择：配置了域名则使用配置域名，否则使用规范化后的请求 host
         if has_domain:
             host = configured_domain
         else:
-            host = (
-                request.headers.get('X-Forwarded-Host')
-                or request.headers.get('Host')
-                or request.host
-            )
+            host = request.host
 
         # Scheme 选择：CDN 模式强制 https，其他模式保持请求 scheme
         effective_scheme = 'https' if cdn_mode else scheme
         base_url = f"{effective_scheme}://{host}"
 
-        # 处理前缀
-        forwarded_prefix = request.headers.get('X-Forwarded-Prefix', '')
-        if forwarded_prefix:
-            base_url += forwarded_prefix.rstrip('/')
+        if prefix:
+            base_url += prefix.rstrip('/')
 
         return base_url
 
@@ -626,9 +688,9 @@ def get_image_domain(request=None, scene: str = '') -> str:
                         from .database.domains import build_domain_url
                         use_https = bool(d.get('use_https', 1))
                         base = build_domain_url(target_domain, d.get('port'), use_https)
-                        # 处理反向代理子路径前缀
+                        # 仅使用可信代理经 ProxyFix 规范化后的前缀。
                         if request:
-                            prefix = request.headers.get('X-Forwarded-Prefix', '')
+                            prefix = request.script_root if _request_from_trusted_proxy(request) else ''
                             if prefix:
                                 base += prefix.rstrip('/')
                         return base
@@ -638,9 +700,9 @@ def get_image_domain(request=None, scene: str = '') -> str:
     chosen = _random.choice(domains)
     use_https = bool(chosen.get('use_https', 1))
     base = build_domain_url(chosen['domain'], chosen.get('port'), use_https)
-    # 处理反向代理子路径前缀
+    # 仅使用可信代理经 ProxyFix 规范化后的前缀。
     if request:
-        prefix = request.headers.get('X-Forwarded-Prefix', '')
+        prefix = request.script_root if _request_from_trusted_proxy(request) else ''
         if prefix:
             base += prefix.rstrip('/')
     return base

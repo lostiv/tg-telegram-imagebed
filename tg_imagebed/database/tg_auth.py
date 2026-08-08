@@ -737,14 +737,11 @@ def set_default_upload_token(tg_user_id: int, token: str) -> bool:
 
 # ===================== Web 验证码登录（新流程） =====================
 
-@db_retry()
+@db_retry(max_attempts=3, base_delay=0.1, max_delay=2.0)
 def consume_web_verify_code(code: str, tg_user_id: int) -> Optional[str]:
     """Bot 端消费 web_verify 验证码
 
-    1. 查找 code_type='web_verify', used_at IS NULL, 未过期
-    2. upsert_tg_user 确保用户已注册
-    3. create_tg_session 创建会话
-    4. 更新 code 记录：tg_user_id, used_at, session_token
+    在同一事务中原子占用验证码并创建会话。
 
     Returns:
         session_token 或 None
@@ -762,18 +759,40 @@ def consume_web_verify_code(code: str, tg_user_id: int) -> Optional[str]:
                 return None
 
             code_id = row['id']
-
-            # 创建会话
-            session_token = create_tg_session(tg_user_id=tg_user_id)
-            if not session_token:
-                return None
-
-            # 标记为已消费，写入 tg_user_id 和 session_token
             cursor.execute('''
                 UPDATE tg_login_codes
-                SET tg_user_id = ?, used_at = CURRENT_TIMESTAMP, session_token = ?
+                SET tg_user_id = ?, used_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+            ''', (tg_user_id, code_id))
+            if cursor.rowcount != 1:
+                return None
+
+            # 确保用户已注册（tg_sessions.tg_user_id 外键引用 tg_users）
+            cursor.execute('''
+                INSERT INTO tg_users (tg_user_id, username, first_name, last_name, last_login_at)
+                VALUES (?, NULL, NULL, NULL, CURRENT_TIMESTAMP)
+                ON CONFLICT(tg_user_id) DO UPDATE SET last_login_at = CURRENT_TIMESTAMP
+            ''', (tg_user_id,))
+
+            expire_days = get_system_setting_int('tg_session_expire_days', 30, minimum=1, maximum=365)
+            expires_at = datetime.utcnow() + timedelta(days=expire_days)
+            session_token = secrets.token_urlsafe(48)
+            session_id = _new_session_id()
+            now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute('DELETE FROM tg_sessions WHERE expires_at < CURRENT_TIMESTAMP')
+            cursor.execute('''
+                INSERT INTO tg_sessions (
+                    session_token, session_id, tg_user_id, expires_at, last_seen_at, status
+                ) VALUES (?, ?, ?, ?, ?, 'active')
+            ''', (
+                session_token, session_id, tg_user_id,
+                expires_at.strftime('%Y-%m-%d %H:%M:%S'), now,
+            ))
+            cursor.execute('''
+                UPDATE tg_login_codes
+                SET session_token = ?
                 WHERE id = ?
-            ''', (tg_user_id, session_token, code_id))
+            ''', (session_token, code_id))
             return session_token
     except sqlite3.OperationalError:
         raise

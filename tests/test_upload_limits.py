@@ -3,6 +3,7 @@
 import tempfile
 import threading
 import unittest
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -25,9 +26,11 @@ from tg_imagebed.database import (
     update_system_setting,
     upsert_tg_user,
     create_tg_session,
+    consume_web_verify_code,
+    create_login_code,
     count_tokens_by_ip,
 )
-from tg_imagebed.api.upload import validate_image_magic
+from tg_imagebed.utils import get_client_ip, get_domain, validate_image_magic
 from tg_imagebed.services.token_service import TokenService
 
 
@@ -184,6 +187,87 @@ class UploadLimitTests(unittest.TestCase):
         )
 
         self.assertEqual(validate_image_magic(heic_header), "image/heic")
+
+    def test_validate_image_magic_rejects_svg(self):
+        self.assertIsNone(validate_image_magic(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"))
+
+    def test_client_ip_ignores_forwarded_headers_without_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={"X-Forwarded-For": "203.0.113.1"},
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": ""}):
+            self.assertEqual(get_client_ip(request), "198.51.100.2")
+
+    def test_client_ip_accepts_headers_from_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={"X-Forwarded-For": "203.0.113.1"},
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}):
+            self.assertEqual(get_client_ip(request), "203.0.113.1")
+
+    def test_domain_ignores_forwarded_headers_without_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={
+                "X-Forwarded-Host": "attacker.example",
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Prefix": "/attacker",
+            },
+            host="imagebed.example",
+            scheme="http",
+            script_root="",
+            remote_addr="198.51.100.2",
+            environ={},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": ""}), \
+             patch("tg_imagebed.utils._get_effective_domain_settings", return_value=("", False)):
+            self.assertEqual(get_domain(request), "http://imagebed.example")
+
+    def test_domain_uses_proxyfix_values_from_trusted_proxy(self):
+        request = SimpleNamespace(
+            headers={},
+            host="public.example",
+            scheme="https",
+            script_root="/imagebed",
+            remote_addr="198.51.100.2",
+            environ={"werkzeug.proxy_fix.orig": {"REMOTE_ADDR": "198.51.100.2"}},
+        )
+        with patch.dict("os.environ", {"TRUSTED_PROXY": "198.51.100.0/24"}), \
+             patch("tg_imagebed.utils._get_effective_domain_settings", return_value=("", False)):
+            self.assertEqual(get_domain(request), "https://public.example/imagebed")
+
+    def test_web_verify_code_is_consumed_once(self):
+        code = create_login_code("web_verify")
+        self.assertIsNotNone(code)
+
+        results = []
+        errors = []
+        barrier = threading.Barrier(2)
+
+        def worker():
+            try:
+                barrier.wait()
+                results.append(consume_web_verify_code(code, 1001))
+            except Exception as error:
+                errors.append(error)
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), 2)
+        successful_sessions = [session for session in results if session]
+        self.assertEqual(len(successful_sessions), 1)
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM tg_sessions")
+            self.assertEqual(cursor.fetchone()[0], 1)
 
     def test_delete_token_with_images_succeeds_when_external_cleanup_fails(self):
         token = create_auth_token(
