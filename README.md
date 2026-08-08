@@ -305,6 +305,13 @@ npm run generate
 docker compose up -d --build
 ```
 
+### 依赖治理
+
+- Python 依赖使用精确版本，更新后须执行 `python -m pytest tests/ -q`。
+- 前端依赖使用 `package-lock.json` 锁定；升级或执行 `npm audit fix` 后须执行 `npm run build`。
+- `npm audit fix --force` 和跨主版本升级须单独评估兼容性，不随常规漏洞修复自动合入。
+- Docker 基础镜像固定到多架构 digest；更新 digest 后须重新构建镜像。
+
 ## 常见问题
 
 ### 没有配置 Telegram Bot，网站能不能先跑起来？
