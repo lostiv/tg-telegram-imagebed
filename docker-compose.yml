@@ -6,6 +6,7 @@ services:
     ports:
       - "127.0.0.1:18793:18793"
     volumes:
+      # 升级 v2.2.12+（非 root 运行）时，旧数据目录需先: chown -R 10001:10001 data
       - ./data:/app/data
     user: "10001:10001"
     security_opt:
