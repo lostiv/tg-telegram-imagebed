@@ -244,11 +244,15 @@ class UploadLimitTests(unittest.TestCase):
         self.assertIsNotNone(code)
 
         results = []
+        errors = []
         barrier = threading.Barrier(2)
 
         def worker():
-            barrier.wait()
-            results.append(consume_web_verify_code(code, 1001))
+            try:
+                barrier.wait()
+                results.append(consume_web_verify_code(code, 1001))
+            except Exception as error:
+                errors.append(error)
 
         threads = [threading.Thread(target=worker) for _ in range(2)]
         for thread in threads:
@@ -256,6 +260,8 @@ class UploadLimitTests(unittest.TestCase):
         for thread in threads:
             thread.join()
 
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), 2)
         successful_sessions = [session for session in results if session]
         self.assertEqual(len(successful_sessions), 1)
         with get_connection() as conn:
