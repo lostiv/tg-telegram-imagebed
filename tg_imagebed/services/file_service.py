@@ -165,6 +165,24 @@ def process_upload(
         else:
             scene = "guest"
 
+    # staged 文件路径上传同样执行格式转换（读入→转换→写回临时文件，保持 put_file 流式路径）
+    if staged_file_path:
+        with open(staged_file_path, 'rb') as _f:
+            _staged_content = _f.read()
+        _converted = convert_image_format(
+            _staged_content, content_type or get_mime_type(filename)
+        )
+        if _converted:
+            _new_content, _new_extension, content_type = _converted
+            filename = f"{os.path.splitext(filename)[0]}{_new_extension}"
+            file_size = len(_new_content)
+            with open(staged_file_path, 'wb') as _f:
+                _f.write(_new_content)
+            # 转换后重新检查大小限制（JPEG 转 PNG 等场景可能超过原限制）
+            if file_size > max_size_mb * 1024 * 1024:
+                logger.warning("拒绝转换后超过大小限制的上传: %s", filename)
+                return None
+
     # 计算文件哈希
     if staged_file_path:
         file_hash = _hash_file(staged_file_path)
