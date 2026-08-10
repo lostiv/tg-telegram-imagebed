@@ -17,6 +17,7 @@
 - Telegram 图床主链路，支持 Bot API 和 Kurigram / MTProto 双通道。
 - 内建 4 种存储驱动：`telegram`、`local`、`s3`、`rclone`。
 - 上传场景路由：可分别为 `guest / token / group / admin` 指定不同后端。
+- 上传图片格式自动转换：可选转换为 WebP、JPEG 或 PNG，动图自动跳过。
 - 管理后台：系统设置、存储配置、Token 管理、CDN 配置、画集管理、应用更新。
 - 游客上传、Token 上传、TG 登录绑定、TG 用户限额与会话控制。
 - Telegram Bot：轮询 / Webhook、群组上传、私聊上传、上传历史、删除控制。

@@ -33,6 +33,9 @@ export interface AdminSystemSettings {
   guest_token_max_expires_days: number
   max_file_size_mb: number
   daily_upload_limit: number
+  image_conversion_enabled: boolean
+  image_conversion_format: string
+  image_conversion_quality: number
   cdn_enabled: boolean
   cloudflare_cdn_domain: string
   cloudflare_api_token: string

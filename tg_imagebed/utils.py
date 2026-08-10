@@ -21,8 +21,9 @@ import hashlib
 import ipaddress
 import atexit
 import threading
+from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from flask import Response
 
 from .config import (
@@ -317,6 +318,67 @@ def get_mime_type(file_path: str) -> str:
     import mimetypes
     guessed, _ = mimetypes.guess_type(file_path)
     return guessed or 'application/octet-stream'
+
+
+def convert_image_format(
+    file_content: bytes,
+    detected_mime: str
+) -> Optional[Tuple[bytes, str, str]]:
+    """按系统设置转换静态图片格式，跳过动图并在失败时返回 None。"""
+    try:
+        from PIL import Image
+        from .database import get_system_setting, get_system_setting_int
+
+        # 解压炸弹防护：限制单张图片像素总量，超限视为错误并回退原图
+        Image.MAX_IMAGE_PIXELS = 100_000_000
+        import warnings
+        warnings.simplefilter('error', Image.DecompressionBombWarning)
+
+        if get_system_setting('image_conversion_enabled') != '1':
+            return None
+
+        target_format = str(
+            get_system_setting('image_conversion_format') or 'webp'
+        ).lower()
+        format_info = {
+            'webp': ('.webp', 'image/webp', 'WEBP'),
+            'jpeg': ('.jpg', 'image/jpeg', 'JPEG'),
+            'png': ('.png', 'image/png', 'PNG'),
+        }
+        target_info = format_info.get(target_format)
+        if not target_info:
+            return None
+
+        source_format = {
+            'image/webp': 'webp',
+            'image/jpeg': 'jpeg',
+            'image/png': 'png',
+        }.get(detected_mime)
+        if source_format == target_format:
+            return None
+
+        quality = get_system_setting_int(
+            'image_conversion_quality', 80, minimum=1, maximum=100
+        )
+        with Image.open(BytesIO(file_content)) as image:
+            if getattr(image, 'is_animated', False):
+                return None
+
+            image.load()
+            if target_format == 'jpeg':
+                if image.mode not in ('RGB', 'L'):
+                    image = image.convert('RGB')
+            elif target_format == 'webp' and (
+                image.mode in ('RGBA', 'LA') or 'transparency' in image.info
+            ):
+                image = image.convert('RGBA')
+
+            output = BytesIO()
+            save_options = {'quality': quality} if target_format != 'png' else {}
+            image.save(output, format=target_info[2], **save_options)
+            return output.getvalue(), target_info[0], target_info[1]
+    except Exception:
+        return None
 
 
 # ===================== HTTP缓存头部管理 =====================
@@ -733,7 +795,7 @@ __all__ = [
     # 加密工具（sign_file_id 为正式名，encrypt_file_id 保留向后兼容）
     'sign_file_id', 'encrypt_file_id',
     # MIME类型
-    'get_mime_type',
+    'get_mime_type', 'convert_image_format',
     # 缓存头部
     'add_cache_headers',
     # 格式化
