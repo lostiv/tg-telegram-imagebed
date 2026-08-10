@@ -17,7 +17,9 @@ from ..database import (
     save_file_info, get_file_info, update_file_path_in_db, release_upload_reservation,
     get_system_setting_int, delete_files_by_ids,
 )
-from ..utils import sign_file_id, get_mime_type, validate_image_magic
+from ..utils import (
+    sign_file_id, get_mime_type, validate_image_magic, convert_image_format,
+)
 from .cdn_service import add_to_cdn_monitor
 from ..storage.router import get_storage_router
 from ..bot_control import get_effective_bot_token
@@ -138,6 +140,12 @@ def process_upload(
             logger.warning("拒绝无效图片上传: %s", filename)
             return None
         content_type = detected_mime
+
+        converted = convert_image_format(file_content, detected_mime)
+        if converted:
+            file_content, new_extension, content_type = converted
+            filename = f"{os.path.splitext(filename)[0]}{new_extension}"
+            file_size = len(file_content)
 
     # 规范化 content_type（防止 None 或空字符串导致后端出错）
     if not content_type:

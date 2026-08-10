@@ -820,6 +820,47 @@
           </template>
         </UFormGroup>
       </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                <UIcon name="heroicons:photo" class="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-stone-900 dark:text-white">图片格式转换</h3>
+                <p class="text-xs text-stone-500 dark:text-stone-400">上传时自动转换静态图片，动图保持原格式</p>
+              </div>
+            </div>
+            <UToggle v-model="settings.image_conversion_enabled" size="lg" />
+          </div>
+        </template>
+
+        <div v-if="settings.image_conversion_enabled" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <UFormGroup label="输出格式">
+            <USelect
+              v-model="settings.image_conversion_format"
+              :options="imageConversionFormatOptions"
+              option-attribute="label"
+              value-attribute="value"
+            />
+          </UFormGroup>
+
+          <UFormGroup label="输出质量">
+            <UInput
+              v-model.number="settings.image_conversion_quality"
+              type="number"
+              min="1"
+              max="100"
+              placeholder="80"
+            />
+            <template #hint>
+              <span class="text-xs text-stone-500">范围 1-100，仅对有损格式生效</span>
+            </template>
+          </UFormGroup>
+        </div>
+      </UCard>
         </AdminSettingsSectionCard>
 
         <AdminSettingsSectionCard
@@ -1441,6 +1482,9 @@ const settings = ref<AdminSystemSettings>({
   guest_token_max_expires_days: 365,
   max_file_size_mb: 100,
   daily_upload_limit: 0,
+  image_conversion_enabled: false,
+  image_conversion_format: 'webp',
+  image_conversion_quality: 80,
   // CDN 配置
   cdn_enabled: false,
   cloudflare_cdn_domain: '',
@@ -1542,7 +1586,14 @@ const sectionFieldGroups: Record<SettingsSectionKey, string[]> = {
   ],
   guest_policy: ['guest_upload_policy', 'guest_token_generation_enabled', 'guest_existing_tokens_policy'],
   token_limits: ['guest_token_max_upload_limit', 'guest_token_max_expires_days', 'max_guest_tokens_per_ip'],
-  upload_limits: ['max_file_size_mb', 'daily_upload_limit', 'allowed_extensions'],
+  upload_limits: [
+    'max_file_size_mb',
+    'daily_upload_limit',
+    'allowed_extensions',
+    'image_conversion_enabled',
+    'image_conversion_format',
+    'image_conversion_quality',
+  ],
   bot: [
     'bot_caption_filename_enabled',
     'bot_inline_buttons_enabled',
@@ -1604,6 +1655,11 @@ const linkFormatOptions = [
 const botUpdateModeOptions = [
   { value: 'polling', label: 'Polling（长轮询）' },
   { value: 'webhook', label: 'Webhook（推送）' },
+]
+const imageConversionFormatOptions = [
+  { value: 'webp', label: 'WebP' },
+  { value: 'jpeg', label: 'JPEG' },
+  { value: 'png', label: 'PNG' },
 ]
 const showWebhookGuide = ref(false)
 

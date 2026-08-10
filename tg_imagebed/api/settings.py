@@ -59,6 +59,9 @@ def _format_settings_for_response(settings: dict) -> dict:
         'guest_token_max_expires_days': _safe_int(settings.get('guest_token_max_expires_days'), 365, 1),
         'max_file_size_mb': _safe_int(settings.get('max_file_size_mb'), 100, 1, 1024),
         'daily_upload_limit': _safe_int(settings.get('daily_upload_limit'), 0, 0),
+        'image_conversion_enabled': settings.get('image_conversion_enabled', '0') == '1',
+        'image_conversion_format': settings.get('image_conversion_format', 'webp'),
+        'image_conversion_quality': _safe_int(settings.get('image_conversion_quality'), 80, 1, 100),
         # CDN 配置
         'cdn_enabled': settings.get('cdn_enabled', '0') == '1',
         'cloudflare_cdn_domain': settings.get('cloudflare_cdn_domain', ''),
@@ -280,6 +283,23 @@ def admin_system_settings():
                     errors.append('每日上传限制不能为负数')
                 else:
                     settings_to_update['daily_upload_limit'] = str(limit)
+
+            if 'image_conversion_enabled' in data:
+                settings_to_update['image_conversion_enabled'] = '1' if data['image_conversion_enabled'] else '0'
+
+            if 'image_conversion_format' in data:
+                image_format = str(data['image_conversion_format']).strip().lower()
+                if image_format not in ('webp', 'jpeg', 'png'):
+                    errors.append('图片转换格式必须为 webp、jpeg 或 png')
+                else:
+                    settings_to_update['image_conversion_format'] = image_format
+
+            if 'image_conversion_quality' in data:
+                quality = _safe_int(data['image_conversion_quality'], -1)
+                if quality < 1 or quality > 100:
+                    errors.append('图片转换质量必须在 1-100 之间')
+                else:
+                    settings_to_update['image_conversion_quality'] = str(quality)
 
             # CDN 配置
             if 'cdn_enabled' in data:

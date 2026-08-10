@@ -88,6 +88,10 @@ DEFAULT_SYSTEM_SETTINGS = {
     'daily_upload_limit': '0',  # 0=无限制
     'guest_token_max_upload_limit': '1000',
     'guest_token_max_expires_days': '365',
+    # 图片格式转换（默认关闭）
+    'image_conversion_enabled': '0',
+    'image_conversion_format': 'webp',
+    'image_conversion_quality': '80',
     # 存储配置
     'storage_active_backend': 'telegram',
     'storage_config_json': '',
