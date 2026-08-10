@@ -329,6 +329,11 @@ def convert_image_format(
         from PIL import Image
         from .database import get_system_setting, get_system_setting_int
 
+        # 解压炸弹防护：限制单张图片像素总量，超限视为错误并回退原图
+        Image.MAX_IMAGE_PIXELS = 100_000_000
+        import warnings
+        warnings.simplefilter('error', Image.DecompressionBombWarning)
+
         if get_system_setting('image_conversion_enabled') != '1':
             return None
 

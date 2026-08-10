@@ -146,6 +146,10 @@ def process_upload(
             file_content, new_extension, content_type = converted
             filename = f"{os.path.splitext(filename)[0]}{new_extension}"
             file_size = len(file_content)
+            # 转换后重新检查大小限制（JPEG 转 PNG 等场景可能超过原限制）
+            if file_size > max_size_mb * 1024 * 1024:
+                logger.warning("拒绝转换后超过大小限制的上传: %s", filename)
+                return None
 
     # 规范化 content_type（防止 None 或空字符串导致后端出错）
     if not content_type:
