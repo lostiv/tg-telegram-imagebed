@@ -190,11 +190,11 @@ DEFAULT_SYSTEM_SETTINGS = {
     'gallery_sso_main_url': '',                # 画集 SSO 主站 URL（回调目标）
     # 应用更新配置（Release Artifact）
     'app_update_source': 'release',            # 更新源：release
-    'app_update_release_repo': 'xiyan520/tg-telegram-imagebed',  # 固定官方仓库（owner/repo）
+    'app_update_release_repo': 'lostiv/tg-telegram-imagebed',  # 固定官方仓库（owner/repo）
     'app_update_release_asset_name': 'tg-imagebed-release.zip',  # Release 主包
     'app_update_release_sha_name': 'tg-imagebed-release.zip.sha256',  # Release 校验文件
     # 兼容旧配置（保留只读）
-    'app_update_repo_url': 'https://github.com/xiyan520/tg-telegram-imagebed.git',
+    'app_update_repo_url': 'https://github.com/lostiv/tg-telegram-imagebed.git',
     'app_update_branch': 'main',
     # 最近执行记录
     'app_update_last_status': 'idle',
