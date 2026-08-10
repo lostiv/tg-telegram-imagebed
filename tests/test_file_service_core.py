@@ -67,7 +67,7 @@ class ConvertImageFormatTests(unittest.TestCase):
             self.assertEqual(img.format, 'WEBP')
 
     def test_disabled_returns_none(self):
-        """转换开关关闭 → 返回 None（原图直传）。"""
+        """转换开关关闭 → 返回 None (原图直传)。"""
         update_system_setting('image_conversion_enabled', '0')
         self.assertIsNone(convert_image_format(_make_image('JPEG'), 'image/jpeg'))
 
@@ -77,17 +77,21 @@ class ConvertImageFormatTests(unittest.TestCase):
         self.assertIsNone(convert_image_format(_make_image('JPEG'), 'image/jpeg'))
 
     def test_invalid_mime_returns_none(self):
-        """未知 MIME → 返回 None（不炸）。"""
-        # application/octet-stream 是未知源格式，convert 内部会查不到映射而返回 None
+        """未知 MIME → 返回 None (不炸)。"""
+        # application/octet-stream 是未知源格式, convert 内部会查不到映射而返回 None
         self.assertIsNone(convert_image_format(_make_image('JPEG'), 'application/octet-stream'))
 
-    def test_animated_gif_skipped(self):
-        """动图必须跳过，绝不转换。"""
+    def test_animated_apng_skipped(self):
+        """动图(多帧APNG)必须跳过, 绝不转换。"""
         buf = io.BytesIO()
         frames = [Image.new('RGB', (32, 32), c) for c in [(255, 0, 0), (0, 255, 0)]]
-        frames[0].save(buf, format='GIF', save_all=True, append_images=frames[1:], duration=100, loop=0)
-        update_system_setting('image_conversion_format', 'webp')
-        self.assertIsNone(convert_image_format(buf.getvalue(), 'image/gif'))
+        frames[0].save(buf, format='PNG', save_all=True, append_images=frames[1:],
+                       duration=100, loop=0)
+        apng = buf.getvalue()
+        # 确认确实是多帧动图, 且源格式是 png(可被转换映射识别, 才会走到动图分支)
+        with Image.open(io.BytesIO(apng)) as img:
+            self.assertTrue(getattr(img, 'is_animated', False))
+        self.assertIsNone(convert_image_format(apng, 'image/png'))
 
     def test_rgba_png_to_webp_keeps_alpha(self):
         """透明 PNG → WebP: alpha 保留。"""
@@ -101,7 +105,7 @@ class ConvertImageFormatTests(unittest.TestCase):
             self.assertIn('A', out.mode)  # 有 alpha 通道
 
     def test_corrupt_image_returns_none(self):
-        """损坏图片 → 返回 None，上传不因转换失败。"""
+        """损坏图片 → 返回 None, 上传不因转换失败。"""
         self.assertIsNone(convert_image_format(b'\x00\x01\x02 not an image', 'image/jpeg'))
 
 
@@ -114,7 +118,7 @@ class ProcessUploadTests(unittest.TestCase):
         init_database()
         init_system_settings()
 
-        # 默认存储后端指向临时 local 目录，避免真实 Telegram 调用
+        # 默认存储后端指向临时 local 目录, 避免真实 Telegram 调用
         self.storage_root = Path(self.temp_dir.name) / 'storage'
         self.storage_root.mkdir()
         update_system_setting('storage_active_backend', 'local')
@@ -161,7 +165,7 @@ class ProcessUploadTests(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_invalid_image_rejected(self):
-        """非图片字节 → None（魔数校验拒绝）。"""
+        """非图片字节 → None (魔数校验拒绝)。"""
         result = file_service.process_upload(b'plain text, not an image', 'f.txt', 'text/plain')
         self.assertIsNone(result)
 

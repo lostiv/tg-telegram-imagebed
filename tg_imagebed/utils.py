@@ -355,7 +355,7 @@ def convert_image_format(
             'image/png': 'png',
         }.get(detected_mime)
         if not source_format:
-            # 未知 MIME：不满足转换条件，回退原图
+            # 未知 MIME: 不满足转换条件, 回退原图
             return None
         if source_format == target_format:
             return None
