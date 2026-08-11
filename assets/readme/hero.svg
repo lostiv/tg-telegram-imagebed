@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="400" viewBox="0 0 1200 400"
+     role="img" aria-labelledby="title desc">
+  <title id="title">tg-telegram-imagebed — 基于 Telegram 存储的自托管图床</title>
+  <desc id="desc">图片上传进 Telegram 频道，秒回直链。支持多存储后端、Cloudflare CDN 与画集分享。左侧标题区，右侧上传管道：上传 → Telegram 存储 → 直链/CDN。</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E1621"/>
+      <stop offset="1" stop-color="#0A1017"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17212B"/>
+      <stop offset="1" stop-color="#131C26"/>
+    </linearGradient>
+    <linearGradient id="tg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#37AEE2"/>
+      <stop offset="1" stop-color="#1E96C8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="400" rx="24" fill="url(#bg)"/>
+
+  <!-- 背景细网格（弱） -->
+  <g stroke="#1B2530" stroke-width="1" opacity="0.6">
+    <path d="M0 80 H1200 M0 160 H1200 M0 240 H1200 M0 320 H1200"/>
+    <path d="M80 0 V400 M160 0 V400 M240 0 V400 M320 0 V400 M400 0 V400 M480 0 V400 M560 0 V400 M640 0 V400 M720 0 V400 M800 0 V400 M880 0 V400 M960 0 V400 M1040 0 V400 M1120 0 V400"/>
+  </g>
+
+  <!-- ============ 左侧标题块 ============ -->
+  <g id="title-block" transform="translate(56 46)">
+    <text x="0" y="0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="15" letter-spacing="1" fill="#2AABEE">SELF-HOSTED IMAGE HOSTING ON TELEGRAM</text>
+
+    <text x="0" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+          font-size="60" font-weight="700" fill="#F5F5F5">tg-telegram-imagebed</text>
+
+    <text x="0" y="100" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+          font-size="27" font-weight="600" fill="#9FB3C8">Telegram 云图床</text>
+
+    <text x="0" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+          font-size="21" fill="#C9D4DE">图片上传进 Telegram，秒回直链。</text>
+    <text x="0" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+          font-size="21" fill="#C9D4DE">多存储后端 · CDN · 画集分享 · 管理后台。</text>
+
+    <text x="0" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" fill="#6E7F92">v2.2.16</text>
+    <circle cx="96" cy="258" r="2.5" fill="#6E7F92"/>
+    <text x="108" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" fill="#6E7F92">Flask</text>
+    <circle cx="164" cy="258" r="2.5" fill="#6E7F92"/>
+    <text x="176" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" fill="#6E7F92">Nuxt 3</text>
+    <circle cx="248" cy="258" r="2.5" fill="#6E7F92"/>
+    <text x="260" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" fill="#6E7F92">Docker</text>
+  </g>
+
+  <!-- ============ 右侧上传管道 ============ -->
+  <g id="pipeline" transform="translate(610 30)">
+    <!-- 节点 1：上传 -->
+    <g transform="translate(0 50)">
+      <rect width="148" height="120" rx="14" fill="url(#card)" stroke="#232F3C" stroke-width="1.5"/>
+      <!-- 图片上传图标 -->
+      <g transform="translate(52 12)" fill="none" stroke="#2AABEE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="40" height="32" rx="5"/>
+        <circle cx="15" cy="15" r="4"/>
+        <path d="M4 34 L17 23 L25 30 L32 24 L44 34"/>
+        <path d="M24 40 v8 M20 44 L24 48 L28 44"/>
+      </g>
+      <text x="74" y="76" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="18" font-weight="600" fill="#E8EBEE">上传</text>
+      <text x="74" y="98" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="12" fill="#8A9199">游客 / Token / 管理员</text>
+      <text x="74" y="116" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10.5" fill="#5B9BB8">格式自动转换</text>
+    </g>
+
+    <!-- 箭头 1 -->
+    <g transform="translate(152 114)">
+      <path d="M0 0 H26" stroke="#2AABEE" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M19 -5 L26 0 L19 5" fill="none" stroke="#2AABEE" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- 节点 2：Telegram 存储 -->
+    <g transform="translate(184 50)">
+      <rect width="148" height="120" rx="14" fill="url(#card)" stroke="#232F3C" stroke-width="1.5"/>
+      <!-- 纸飞机图标 -->
+      <g transform="translate(50 10)" fill="none" stroke="#2AABEE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 24 L40 4 L26 40 L18 30 L2 24 Z"/>
+        <path d="M18 30 L40 4"/>
+      </g>
+      <text x="74" y="76" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="18" font-weight="600" fill="#E8EBEE">Telegram 存储</text>
+      <text x="74" y="98" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="12" fill="#8A9199">Bot API / MTProto</text>
+      <text x="74" y="116" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10.5" fill="#5B9BB8">>20MB 自动切换</text>
+    </g>
+
+    <!-- 箭头 2 -->
+    <g transform="translate(336 114)">
+      <path d="M0 0 H26" stroke="#2AABEE" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M19 -5 L26 0 L19 5" fill="none" stroke="#2AABEE" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- 节点 3：直链 / CDN -->
+    <g transform="translate(368 50)">
+      <rect width="148" height="120" rx="14" fill="url(#card)" stroke="#232F3C" stroke-width="1.5"/>
+      <!-- 链接图标 -->
+      <g transform="translate(51 10)" fill="none" stroke="#2AABEE" stroke-width="2.2" stroke-linecap="round">
+        <path d="M14 24 L30 8"/>
+        <path d="M8 20 L6 22 C2 26 2 32 6 36 L10 40 C14 44 20 44 24 40 L26 38"/>
+        <path d="M38 24 L40 22 C44 18 44 12 40 8 L36 4 C32 0 26 0 22 4 L20 6"/>
+        <path d="M10 22 h8 M26 22 h8 M22 26 v8"/>
+      </g>
+      <text x="74" y="76" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="18" font-weight="600" fill="#E8EBEE">直链 · CDN</text>
+      <text x="74" y="98" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="12" fill="#8A9199">Cloudflare 加速</text>
+      <text x="74" y="116" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10.5" fill="#5B9BB8">/image/&lt;id&gt;</text>
+    </g>
+
+    <!-- 底部四后端 motif -->
+    <g transform="translate(96 230)">
+      <g transform="translate(0 0)">
+        <rect width="96" height="42" rx="9" fill="#17212B" stroke="#232F3C" stroke-width="1.5"/>
+        <text x="48" y="26" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" fill="#8AB4D8">telegram</text>
+      </g>
+      <g transform="translate(104 0)">
+        <rect width="96" height="42" rx="9" fill="#17212B" stroke="#232F3C" stroke-width="1.5"/>
+        <text x="48" y="26" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" fill="#8AB4D8">local</text>
+      </g>
+      <g transform="translate(208 0)">
+        <rect width="96" height="42" rx="9" fill="#17212B" stroke="#232F3C" stroke-width="1.5"/>
+        <text x="48" y="26" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" fill="#8AB4D8">s3</text>
+      </g>
+      <g transform="translate(312 0)">
+        <rect width="96" height="42" rx="9" fill="#17212B" stroke="#232F3C" stroke-width="1.5"/>
+        <text x="48" y="26" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" fill="#8AB4D8">rclone</text>
+      </g>
+      <text x="204" y="64" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" font-size="12" fill="#6E7F92">按场景路由的存储后端</text>
+    </g>
+  </g>
+</svg>
