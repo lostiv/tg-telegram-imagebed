@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 _gallery_auth_tokens: dict[str, dict] = {}
 # 多线程并发保护锁（waitress 多线程模型下必须加锁）
 _gallery_auth_tokens_lock = threading.Lock()
+_active_sessions_lock = threading.RLock()
 
 _GALLERY_TOKEN_EXPIRE_SECONDS = 60  # token 有效期 60 秒
 
@@ -407,6 +408,16 @@ def _prune_and_migrate_sessions(sessions: list[dict], now: float | None = None) 
     return normalized
 
 
+def _with_active_sessions_lock(func):
+    """串行化活跃会话的读取和写入。"""
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with _active_sessions_lock:
+            return func(*args, **kwargs)
+    return wrapped
+
+
+@_with_active_sessions_lock
 def _get_active_sessions() -> list[dict]:
     """从数据库读取活跃 session 列表"""
     try:
@@ -420,6 +431,7 @@ def _get_active_sessions() -> list[dict]:
         return []
 
 
+@_with_active_sessions_lock
 def _save_active_sessions(sessions: list[dict]):
     """保存活跃 session 列表到数据库"""
     try:
@@ -433,6 +445,7 @@ def _save_active_sessions(sessions: list[dict]):
         logger.debug(f"保存活跃 session 失败: {e}")
 
 
+@_with_active_sessions_lock
 def _register_session(
     token: str,
     ip: str,
@@ -486,6 +499,7 @@ def _register_session(
     _save_active_sessions(sessions)
 
 
+@_with_active_sessions_lock
 def _update_session_activity(
     token: str,
     *,
@@ -555,6 +569,7 @@ def _update_session_activity(
     _save_active_sessions(sessions)
 
 
+@_with_active_sessions_lock
 def _remove_session(token: str = '', session_id: str = '') -> int:
     """移除指定 session（按 token 或 session_id）"""
     sessions = _get_active_sessions()
