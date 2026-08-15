@@ -358,7 +358,8 @@ def shared_gallery_api(share_token: str):
                     from itsdangerous import URLSafeTimedSerializer
                     serializer = URLSafeTimedSerializer(SECRET_KEY)
                     data = serializer.loads(unlock_cookie, max_age=86400)
-                    is_unlocked = data.get('gallery_id') == gallery['id']
+                    is_unlocked = (data.get('gallery_id') == gallery['id'] and
+                                   data.get('access_version') == gallery.get('access_version', 0))
                 except Exception:
                     pass
             if not is_unlocked:
@@ -379,7 +380,8 @@ def shared_gallery_api(share_token: str):
                     from itsdangerous import URLSafeTimedSerializer
                     serializer = URLSafeTimedSerializer(SECRET_KEY)
                     data = serializer.loads(unlock_cookie, max_age=86400)
-                    is_unlocked = data.get('gallery_id') == gallery['id']
+                    is_unlocked = (data.get('gallery_id') == gallery['id'] and
+                                   data.get('access_version') == gallery.get('access_version', 0))
                 except Exception:
                     pass
             if not is_unlocked:
@@ -458,7 +460,7 @@ def unlock_gallery(share_token: str):
     from itsdangerous import URLSafeTimedSerializer
     from ..config import SECRET_KEY
     serializer = URLSafeTimedSerializer(SECRET_KEY)
-    unlock_token = serializer.dumps({'gallery_id': gallery['id']})
+    unlock_token = serializer.dumps({'gallery_id': gallery['id'], 'access_version': gallery.get('access_version', 0)})
 
     response = jsonify({'success': True, 'message': '解锁成功'})
     response.set_cookie(
@@ -500,7 +502,7 @@ def unlock_gallery_with_token(share_token: str):
     # 生成解锁 cookie（24小时有效）
     from itsdangerous import URLSafeTimedSerializer
     serializer = URLSafeTimedSerializer(SECRET_KEY)
-    cookie_token = serializer.dumps({'gallery_id': gallery['id']})
+    cookie_token = serializer.dumps({'gallery_id': gallery['id'], 'access_version': gallery.get('access_version', 0)})
 
     response = jsonify({'success': True, 'message': '解锁成功'})
     response.set_cookie(
@@ -576,7 +578,8 @@ def shared_all_gallery_detail_api(share_all_token: str, gallery_id: int):
                     from itsdangerous import URLSafeTimedSerializer
                     serializer = URLSafeTimedSerializer(SECRET_KEY)
                     data = serializer.loads(unlock_cookie, max_age=86400)
-                    is_unlocked = data.get('gallery_id') == gallery['id']
+                    is_unlocked = (data.get('gallery_id') == gallery['id'] and
+                                   data.get('access_version') == gallery.get('access_version', 0))
                 except Exception:
                     pass
             if not is_unlocked:
@@ -597,7 +600,8 @@ def shared_all_gallery_detail_api(share_all_token: str, gallery_id: int):
                     from itsdangerous import URLSafeTimedSerializer
                     serializer = URLSafeTimedSerializer(SECRET_KEY)
                     data = serializer.loads(unlock_cookie, max_age=86400)
-                    is_unlocked = data.get('gallery_id') == gallery['id']
+                    is_unlocked = (data.get('gallery_id') == gallery['id'] and
+                                   data.get('access_version') == gallery.get('access_version', 0))
                 except Exception:
                     pass
             if not is_unlocked:
@@ -679,7 +683,7 @@ def shared_all_unlock_gallery_api(share_all_token: str, gallery_id: int):
     from itsdangerous import URLSafeTimedSerializer
     from ..config import SECRET_KEY
     serializer = URLSafeTimedSerializer(SECRET_KEY)
-    unlock_token = serializer.dumps({'gallery_id': gallery['id']})
+    unlock_token = serializer.dumps({'gallery_id': gallery['id'], 'access_version': gallery.get('access_version', 0)})
 
     response = jsonify({'success': True, 'message': '解锁成功'})
     response.set_cookie(
@@ -716,7 +720,7 @@ def shared_all_unlock_gallery_with_token_api(share_all_token: str, gallery_id: i
 
     from itsdangerous import URLSafeTimedSerializer
     serializer = URLSafeTimedSerializer(SECRET_KEY)
-    cookie_token = serializer.dumps({'gallery_id': gallery['id']})
+    cookie_token = serializer.dumps({'gallery_id': gallery['id'], 'access_version': gallery.get('access_version', 0)})
 
     response = jsonify({'success': True, 'message': '解锁成功'})
     response.set_cookie(

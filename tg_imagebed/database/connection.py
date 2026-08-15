@@ -588,6 +588,7 @@ def _migrate_galleries_table(cursor, conn) -> list:
     gallery_new_columns = [
         ('access_mode', "TEXT DEFAULT 'public'"),
         ('password_hash', 'TEXT'),
+        ('access_version', 'INTEGER DEFAULT 0'),
         ('hide_from_share_all', 'INTEGER DEFAULT 0'),
         ('cover_image', 'TEXT'),
         # 显示设置字段
