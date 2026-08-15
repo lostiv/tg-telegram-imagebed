@@ -315,17 +315,21 @@ jobs:
         if: needs.prepare.outputs.is_tag_push != 'true'
         run: echo "${{ needs.prepare.outputs.version }}" > VERSION
 
+      - name: Sync hero.svg version
+        if: needs.prepare.outputs.is_tag_push != 'true'
+        run: python3 scripts/update_hero_version.py
+
       - name: Commit and push VERSION
         if: needs.prepare.outputs.is_tag_push != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- VERSION; then
+          if git diff --quiet -- VERSION assets/readme/hero.svg; then
             echo "VERSION unchanged, skip commit."
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add VERSION
+            git add VERSION assets/readme/hero.svg
             git commit -m "chore(release): bump version to ${{ needs.prepare.outputs.version }} [skip ci]"
             git push origin HEAD:main
           fi
