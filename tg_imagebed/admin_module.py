@@ -1561,6 +1561,16 @@ def register_admin_routes(app, DATABASE_PATH, get_all_files_count, get_total_siz
                 except Exception:
                     pass
 
+                # 删除数据库记录（分块处理），先提交以避免外部删除失败导致回滚。
+                for chunk in _chunked(ids):
+                    placeholders = ','.join('?' * len(chunk))
+                    cursor.execute(f'''
+                        DELETE FROM file_storage
+                        WHERE encrypted_id IN ({placeholders})
+                    ''', chunk)
+                    deleted_count += cursor.rowcount
+                conn.commit()
+
                 # 当 delete_storage=True 且 tg_sync_delete_enabled=True 时，删除存储后端文件和TG消息
                 if delete_storage and tg_sync_delete_enabled:
                     # 删除存储后端文件（静默忽略失败）
@@ -1640,15 +1650,6 @@ def register_admin_routes(app, DATABASE_PATH, get_all_files_count, get_total_siz
                                     pass
                     except Exception as e:
                         logger.debug(f"TG消息删除跳过: {e}")
-
-                # 删除数据库记录（分块处理）
-                for chunk in _chunked(ids):
-                    placeholders = ','.join('?' * len(chunk))
-                    cursor.execute(f'''
-                        DELETE FROM file_storage
-                        WHERE encrypted_id IN ({placeholders})
-                    ''', chunk)
-                    deleted_count += cursor.rowcount
 
             logger.info(f"管理员删除了 {deleted_count} 张图片，TG消息同步删除 {tg_deleted_count} 条，存储文件删除 {storage_deleted_count} 个")
 

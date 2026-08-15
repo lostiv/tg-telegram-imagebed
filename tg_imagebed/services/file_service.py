@@ -165,8 +165,8 @@ def process_upload(
         else:
             scene = "guest"
 
-    # staged 文件路径上传同样执行格式转换（读入→转换→写回临时文件，保持 put_file 流式路径）
-    if staged_file_path:
+    # staged 文件路径上传仅在转换启用且安全大小范围内读取，保持大文件流式路径。
+    if staged_file_path and get_system_setting_int('image_conversion_enabled', 0, minimum=0, maximum=1) == 1 and (content_type or get_mime_type(filename)) in {'image/webp', 'image/jpeg', 'image/png'} and file_size < 50 * 1024 * 1024:
         with open(staged_file_path, 'rb') as _f:
             _staged_content = _f.read()
         _converted = convert_image_format(

@@ -152,6 +152,7 @@ def update_cdn_cache_status(encrypted_id: str, cached: bool) -> None:
         logger.info(f"更新CDN缓存状态: {encrypted_id} -> {'已缓存' if cached else '未缓存'}")
 
 
+@db_retry(max_attempts=3, base_delay=0.1, max_delay=2.0)
 def update_access_count(encrypted_id: str, access_type: str = 'direct_access') -> None:
     """更新访问计数
 
