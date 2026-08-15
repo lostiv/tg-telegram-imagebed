@@ -17,6 +17,7 @@ import shutil
 import threading
 import time
 import uuid
+from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, Optional
 from urllib.parse import unquote, urlparse
 
@@ -29,6 +30,7 @@ _BOT_API_PHOTO_LIMIT = 10 * 1024 * 1024
 _KURIGRAM_THRESHOLD = 20 * 1024 * 1024
 _KURIGRAM_STREAM_CHUNK_SIZE = 1024 * 1024
 _STREAM_CHUNK_SIZE = 8192
+_FILE_PATH_CACHE_TTL = timedelta(minutes=5)
 _KURIGRAM_CLIENT_CLASS = None
 _KURIGRAM_CLIENT_CLASS_LOCK = threading.Lock()
 
@@ -99,6 +101,20 @@ class TelegramBackend(StorageBackend):
         Bot API getFile/file 链路对大文件能力偏弱，文件路径缺失时也回退到 Kurigram。
         """
         return self._can_use_kurigram() and (file_size > _KURIGRAM_THRESHOLD or not file_path)
+
+    @staticmethod
+    def _is_file_path_cache_expired(file_info: Dict[str, Any]) -> bool:
+        """判断 Telegram file_path 缓存是否需要刷新"""
+        last_updated = file_info.get('last_file_path_update')
+        if not last_updated:
+            return True
+        try:
+            updated_at = datetime.fromisoformat(str(last_updated).replace('Z', '+00:00'))
+            if updated_at.tzinfo is not None:
+                updated_at = updated_at.astimezone().replace(tzinfo=None)
+            return datetime.now() - updated_at >= _FILE_PATH_CACHE_TTL
+        except (TypeError, ValueError):
+            return True
 
     def _build_kurigram_proxy(self) -> Optional[Dict[str, Any]]:
         """将 URL 形式代理转换为 Pyrogram/Kurigram 需要的 dict"""
@@ -745,12 +761,12 @@ class TelegramBackend(StorageBackend):
                 body=[b'not found']
             )
 
-        # 刷新 file_path（Telegram 的 file_path 会过期）
-        fresh = self._get_file_path(file_id)
         updated_fields: Optional[Dict[str, Any]] = None
-        if fresh and fresh != file_path:
-            file_path = fresh
-            updated_fields = {'file_path': fresh}
+        if not file_path or self._is_file_path_cache_expired(file_info):
+            fresh = self._get_file_path(file_id)
+            if fresh:
+                file_path = fresh
+                updated_fields = {'file_path': fresh}
 
         if self._should_use_kurigram_download(file_size=file_size, file_path=file_path):
             try:
@@ -797,6 +813,23 @@ class TelegramBackend(StorageBackend):
             resp = self._session.get(file_url, stream=True, timeout=60, headers=headers)
         except Exception as e:
             logger.error(f"Telegram 下载失败: {e}")
+            resp = None
+
+        if resp is None or resp.status_code not in (200, 206):
+            if resp is not None:
+                resp.close()
+            fresh = self._get_file_path(file_id)
+            if fresh:
+                file_path = fresh
+                updated_fields = {'file_path': fresh}
+                file_url = fresh if fresh.startswith('https://') else f"https://api.telegram.org/file/bot{self._bot_token}/{fresh}"
+                try:
+                    resp = self._session.get(file_url, stream=True, timeout=60, headers=headers)
+                except Exception as e:
+                    logger.error(f"Telegram 下载失败: {e}")
+                    resp = None
+
+        if resp is None:
             return DownloadResult(
                 status_code=502,
                 content_type='text/plain',

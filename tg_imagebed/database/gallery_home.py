@@ -3,6 +3,7 @@
 """画集首页编排配置与数据聚合"""
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence
 
 from ..config import logger
@@ -331,13 +332,42 @@ def _query_gallery_items(
     where_clause: str = '',
     where_params: Optional[Sequence[Any]] = None,
     order_clause: str = 'g.updated_at DESC',
-    limit: int = 10
+    limit: Optional[int] = 10
 ) -> List[Dict[str, Any]]:
-    limit = _to_int(limit, 10, minimum=1, maximum=100)
     params = list(where_params or [])
-    sql = _gallery_base_query(where_clause) + f'\nORDER BY {order_clause}\nLIMIT ?'
-    cursor.execute(sql, params + [limit])
+    sql = _gallery_base_query(where_clause) + f'\nORDER BY {order_clause}'
+    if limit is not None:
+        limit = _to_int(limit, 10, minimum=1, maximum=100)
+        sql += '\nLIMIT ?'
+        params.append(limit)
+    cursor.execute(sql, params)
     return [dict(row) for row in cursor.fetchall()]
+
+
+def _sqlite_window_cutoff(window_days: int) -> str:
+    """返回与 SQLite datetime('now') 一致的窗口起点"""
+    return (datetime.utcnow() - timedelta(days=window_days)).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _sqlite_nocase_key(value: Any) -> bytes:
+    """模拟 SQLite NOCASE 的 ASCII 大小写比较"""
+    return str(value or '').encode('utf-8').translate(bytes.maketrans(
+        b'ABCDEFGHIJKLMNOPQRSTUVWXYZ', b'abcdefghijklmnopqrstuvwxyz'
+    ))
+
+
+def _sort_gallery_items(items: List[Dict[str, Any]], auto_sort: str) -> List[Dict[str, Any]]:
+    """按首页自动排序规则在内存中排序"""
+    if auto_sort == 'image_count_desc':
+        return sorted(items, key=lambda item: (int(item.get('image_count') or 0), item.get('updated_at') or ''), reverse=True)
+    if auto_sort == 'editor_pick_desc':
+        return sorted(items, key=lambda item: (int(item.get('editor_pick_weight') or 0), item.get('updated_at') or ''), reverse=True)
+    if auto_sort == 'created_desc':
+        return sorted(items, key=lambda item: item.get('created_at') or '', reverse=True)
+    if auto_sort == 'name_asc':
+        by_updated = sorted(items, key=lambda item: item.get('updated_at') or '', reverse=True)
+        return sorted(by_updated, key=lambda item: _sqlite_nocase_key(item.get('name')))
+    return sorted(items, key=lambda item: item.get('updated_at') or '', reverse=True)
 
 
 def get_gallery_home_public_payload() -> Dict[str, Any]:
@@ -347,6 +377,8 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
             cursor = conn.cursor()
             config = get_gallery_home_config()
             sections = list_gallery_home_sections(include_items=False)
+            candidate_rows = _query_gallery_items(cursor, limit=None)
+            candidates = {int(item['id']): item for item in candidate_rows}
 
             section_results: List[Dict[str, Any]] = []
             for section in sections:
@@ -366,41 +398,29 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
                         ORDER BY si.pin_order ASC, si.id ASC
                     ''', (section['section_key'],))
                     pinned_ids = [int(r['gallery_id']) for r in cursor.fetchall()]
-                    if pinned_ids:
-                        placeholders = ','.join('?' * len(pinned_ids))
-                        pinned_order = 'CASE g.id ' + ' '.join(
-                            [f'WHEN {gid} THEN {idx}' for idx, gid in enumerate(pinned_ids)]
-                        ) + ' END ASC'
-                        pinned_items = _query_gallery_items(
-                            cursor,
-                            where_clause=f'g.id IN ({placeholders})',
-                            where_params=pinned_ids,
-                            order_clause=pinned_order,
-                            limit=max_items,
-                        )
-                        items.extend(pinned_items)
-                        used_ids.update(int(it['id']) for it in pinned_items)
+                    for gallery_id in pinned_ids:
+                        if len(items) >= max_items:
+                            break
+                        item = candidates.get(gallery_id)
+                        if item:
+                            items.append(item)
+                            used_ids.add(gallery_id)
 
                 if source_mode in ('hybrid', 'auto') and len(items) < max_items:
-                    where_parts: List[str] = []
-                    where_params: List[Any] = []
-                    if used_ids:
-                        placeholders = ','.join('?' * len(used_ids))
-                        where_parts.append(f'g.id NOT IN ({placeholders})')
-                        where_params.extend(list(used_ids))
                     window_days = _to_int(section.get('auto_window_days'), 0, minimum=0, maximum=3650)
-                    if window_days > 0:
-                        where_parts.append("g.updated_at >= datetime('now', ?)")
-                        where_params.append(f'-{window_days} days')
-                    where_clause = ' AND '.join(where_parts)
                     auto_sort = section.get('auto_sort') or 'updated_desc'
-                    auto_items = _query_gallery_items(
-                        cursor,
-                        where_clause=where_clause,
-                        where_params=where_params,
-                        order_clause=_auto_sort_sql(auto_sort),
-                        limit=max_items - len(items),
+                    auto_items = _sort_gallery_items(
+                        [
+                            item for gallery_id, item in candidates.items()
+                            if gallery_id not in used_ids
+                            and (
+                                window_days <= 0
+                                or item.get('updated_at') >= _sqlite_window_cutoff(window_days)
+                            )
+                        ],
+                        auto_sort,
                     )
+                    auto_items = auto_items[:max_items - len(items)]
                     items.extend(auto_items)
                     used_ids.update(int(it['id']) for it in auto_items)
 
@@ -413,14 +433,7 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
             # Hero：手动优先，失败则回退到第一个分区第一项
             hero_item: Optional[Dict[str, Any]] = None
             if config.get('hero_mode') == 'manual' and config.get('hero_gallery_id'):
-                manual_hero = _query_gallery_items(
-                    cursor,
-                    where_clause='g.id = ?',
-                    where_params=[config['hero_gallery_id']],
-                    order_clause='g.updated_at DESC',
-                    limit=1,
-                )
-                hero_item = manual_hero[0] if manual_hero else None
+                hero_item = candidates.get(int(config['hero_gallery_id']))
             if not hero_item:
                 for section in section_results:
                     if section.get('items'):
@@ -431,11 +444,7 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
                 _to_int(config.get('mobile_items_per_section'), 4, minimum=1, maximum=12),
                 _to_int(config.get('desktop_items_per_section'), 8, minimum=1, maximum=24),
             )
-            recent_items = _query_gallery_items(
-                cursor,
-                order_clause='g.updated_at DESC',
-                limit=min(24, max(6, recent_limit)),
-            )
+            recent_items = _sort_gallery_items(candidate_rows, 'updated_desc')[:min(24, max(6, recent_limit))]
 
             return {
                 'config': config,

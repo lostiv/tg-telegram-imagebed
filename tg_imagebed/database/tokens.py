@@ -3,7 +3,7 @@
 """Token 管理（用户 + 管理员）"""
 import sqlite3
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple
 
 from ..config import logger
@@ -257,6 +257,12 @@ def reserve_token_upload(token: str, *, daily_limit: int = 0) -> Dict[str, Any]:
                 upload_limit_int = 0
 
             if daily_limit > 0:
+                local_today = datetime.now().astimezone().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                local_tomorrow = local_today + timedelta(days=1)
+                today_start = local_today.astimezone(timezone.utc).replace(tzinfo=None)
+                tomorrow_start = local_tomorrow.astimezone(timezone.utc).replace(tzinfo=None)
                 cursor.execute(
                     '''
                     SELECT COUNT(*)
@@ -270,9 +276,13 @@ def reserve_token_upload(token: str, *, daily_limit: int = 0) -> Dict[str, Any]:
                     '''
                     SELECT COUNT(*)
                     FROM file_storage
-                    WHERE auth_token = ? AND date(created_at) = date('now', 'localtime')
+                    WHERE auth_token = ? AND created_at >= ? AND created_at < ?
                     ''',
-                    (token,)
+                    (
+                        token,
+                        today_start.strftime('%Y-%m-%d %H:%M:%S'),
+                        tomorrow_start.strftime('%Y-%m-%d %H:%M:%S'),
+                    )
                 )
                 uploaded_today = int((cursor.fetchone() or (0,))[0] or 0)
                 if uploaded_today + reserved_today >= int(daily_limit):

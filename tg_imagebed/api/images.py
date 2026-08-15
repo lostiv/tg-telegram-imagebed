@@ -379,9 +379,7 @@ def health_check():
     checks = {}
     try:
         with get_connection() as conn:
-            result = conn.execute('PRAGMA quick_check').fetchone()[0]
-            if result != 'ok':
-                raise RuntimeError(f'SQLite quick_check failed: {result}')
+            conn.execute('SELECT 1').fetchone()
         checks['database'] = 'ok'
 
         # 仅校验本地配置解析，不探测 Telegram 等外部依赖。

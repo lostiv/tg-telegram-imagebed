@@ -245,6 +245,21 @@ def get_system_setting(key: str) -> Optional[str]:
         return DEFAULT_SYSTEM_SETTINGS.get(key)
 
 
+# ===================== 系统设置 =====================
+_system_settings_version = 0
+
+
+def get_system_settings_version() -> int:
+    """获取系统设置版本，用于失效进程内缓存"""
+    return _system_settings_version
+
+
+def _invalidate_system_settings_cache() -> None:
+    """标记系统设置已更新"""
+    global _system_settings_version
+    _system_settings_version += 1
+
+
 def get_all_system_settings() -> Dict[str, Any]:
     """获取所有系统设置"""
     try:
@@ -252,11 +267,10 @@ def get_all_system_settings() -> Dict[str, Any]:
             cursor = conn.cursor()
             settings = dict(DEFAULT_SYSTEM_SETTINGS)  # 从默认值开始
 
-            for key in DEFAULT_SYSTEM_SETTINGS.keys():
-                cursor.execute('SELECT value FROM admin_config WHERE key = ?', (key,))
-                row = cursor.fetchone()
-                if row:
-                    settings[key] = row[0]
+            cursor.execute('SELECT key, value FROM admin_config')
+            for row in cursor.fetchall():
+                if row['key'] in settings:
+                    settings[row['key']] = row['value']
 
             return settings
     except Exception as e:
@@ -281,6 +295,7 @@ def update_system_setting(key: str, value: str) -> bool:
                 logger.info(f"更新系统设置: {key}=[REDACTED]")
             else:
                 logger.info(f"更新系统设置: {key}={value}")
+            _invalidate_system_settings_cache()
             return True
     except Exception as e:
         logger.error(f"更新系统设置失败 {key}: {e}")
@@ -302,6 +317,7 @@ def update_system_settings(settings: Dict[str, str]) -> bool:
                         logger.info(f"更新系统设置: {key}=[REDACTED]")
                     else:
                         logger.info(f"更新系统设置: {key}={value}")
+            _invalidate_system_settings_cache()
             return True
     except Exception as e:
         logger.error(f"批量更新系统设置失败: {e}")

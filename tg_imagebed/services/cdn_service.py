@@ -125,9 +125,14 @@ class CloudflareCDN:
         self.base_url = 'https://api.cloudflare.com/client/v4'
         self._cfg_ts = 0.0
         self._session_lock = threading.Lock()
+        self._session_local = threading.local()
+        self._session_proxy = None
+        self._session_generation = 0
 
-        # 创建带重试的 Session
-        self._session = requests.Session()
+    @staticmethod
+    def _create_session(proxy: Optional[str] = None) -> requests.Session:
+        """创建带重试配置的线程专属 Session"""
+        session = requests.Session()
         retry = Retry(
             total=3,
             backoff_factor=0.5,
@@ -135,7 +140,22 @@ class CloudflareCDN:
             allowed_methods=('GET', 'HEAD', 'POST'),
             raise_on_status=False,
         )
-        self._session.mount('https://', HTTPAdapter(max_retries=retry))
+        session.mount('https://', HTTPAdapter(max_retries=retry))
+        if proxy:
+            session.proxies = {'http': proxy, 'https': proxy}
+        return session
+
+    def _get_session(self) -> requests.Session:
+        """获取当前线程的 CDN Session"""
+        with self._session_lock:
+            generation = self._session_generation
+            proxy = self._session_proxy
+        local_session = getattr(self._session_local, 'session', None)
+        if getattr(self._session_local, 'generation', -1) != generation:
+            local_session = self._create_session(proxy)
+            self._session_local.session = local_session
+            self._session_local.generation = generation
+        return local_session
 
     def _refresh_config(self, *, force: bool = False) -> None:
         """从数据库刷新 CDN 配置"""
@@ -152,24 +172,12 @@ class CloudflareCDN:
         self.headers = headers
         self._cfg_ts = now
 
-        # 同步代理设置：创建新 Session 避免与请求线程竞态（Session 非线程安全）
+        # 仅替换 Session 配置，实际请求使用各线程独立的 Session。
         proxy = get_proxy_url()
-        new_session = requests.Session()
-        retry_cfg = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=('GET', 'HEAD', 'POST'),
-            raise_on_status=False,
-        )
-        new_session.mount('https://', HTTPAdapter(max_retries=retry_cfg))
-        if proxy:
-            new_session.proxies = {'http': proxy, 'https': proxy}
         with self._session_lock:
-            old_session = self._session
-            self._session = new_session
-            if old_session is not None:
-                old_session.close()
+            if proxy != self._session_proxy:
+                self._session_proxy = proxy
+                self._session_generation += 1
 
     def _api_post(self, path: str, payload: dict) -> Tuple[bool, str]:
         """发送 Cloudflare API POST 请求"""
@@ -177,17 +185,16 @@ class CloudflareCDN:
         if not self.api_token or not self.zone_id:
             return False, 'missing Cloudflare credentials'
 
-        with self._session_lock:
-            session = self._session
-            try:
-                resp = session.post(
-                    f'{self.base_url}{path}',
-                    headers=self.headers,
-                    json=payload,
-                    timeout=20,
-                )
-            except Exception as e:
-                return False, str(e)
+        session = self._get_session()
+        try:
+            resp = session.post(
+                f'{self.base_url}{path}',
+                headers=self.headers,
+                json=payload,
+                timeout=20,
+            )
+        except Exception as e:
+            return False, str(e)
 
         try:
             data = resp.json()
@@ -215,9 +222,8 @@ class CloudflareCDN:
             'Range': 'bytes=0-0',
         }
         try:
-            with self._session_lock:
-                session = self._session
-                resp = session.get(url, headers=headers, timeout=15, allow_redirects=False)
+            session = self._get_session()
+            resp = session.get(url, headers=headers, timeout=15, allow_redirects=False)
             cf_cache_status = resp.headers.get('CF-Cache-Status', '')
             age_raw = resp.headers.get('Age')
             age = int(age_raw) if age_raw and str(age_raw).isdigit() else None

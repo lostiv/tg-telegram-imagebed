@@ -79,19 +79,38 @@ def list_galleries(owner_token: str, page: int = 1, limit: int = 50) -> Dict[str
             total = cursor.fetchone()[0]
             offset = (page - 1) * limit
             # 优先使用手动设置的封面，否则取第一张图（按添加时间 ASC）
-            # 注意：使用 resolved_cover_image 避免与 g.* 中的 cover_image 列名冲突
             cursor.execute('''
-                SELECT g.*,
-                    (SELECT COUNT(*) FROM gallery_images gi WHERE gi.gallery_id = g.id) AS image_count,
-                    COALESCE(g.cover_image, (
-                        SELECT fs.encrypted_id FROM gallery_images gi2
-                        JOIN file_storage fs ON gi2.encrypted_id = fs.encrypted_id
-                        WHERE gi2.gallery_id = g.id ORDER BY gi2.added_at ASC LIMIT 1
-                    )) AS resolved_cover_image
-                FROM galleries g
-                WHERE g.owner_token = ? OR (g.owner_type = 'admin' AND g.access_mode = 'public')
-                ORDER BY g.owner_type = 'admin' ASC, g.updated_at DESC
-                LIMIT ? OFFSET ?
+                WITH page_galleries AS (
+                    SELECT *
+                    FROM galleries
+                    WHERE owner_token = ? OR (owner_type = 'admin' AND access_mode = 'public')
+                    ORDER BY owner_type = 'admin' ASC, updated_at DESC
+                    LIMIT ? OFFSET ?
+                ), image_counts AS (
+                    SELECT gi.gallery_id, COUNT(*) AS image_count
+                    FROM gallery_images gi
+                    JOIN page_galleries pg ON pg.id = gi.gallery_id
+                    GROUP BY gi.gallery_id
+                ), first_images AS (
+                    SELECT gallery_id, encrypted_id
+                    FROM (
+                        SELECT gi.gallery_id, fs.encrypted_id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY gi.gallery_id
+                                ORDER BY gi.added_at ASC
+                            ) AS image_rank
+                        FROM gallery_images gi
+                        JOIN page_galleries pg ON pg.id = gi.gallery_id
+                        JOIN file_storage fs ON fs.encrypted_id = gi.encrypted_id
+                    )
+                    WHERE image_rank = 1
+                )
+                SELECT pg.*, COALESCE(ic.image_count, 0) AS image_count,
+                    COALESCE(pg.cover_image, fi.encrypted_id) AS resolved_cover_image
+                FROM page_galleries pg
+                LEFT JOIN image_counts ic ON ic.gallery_id = pg.id
+                LEFT JOIN first_images fi ON fi.gallery_id = pg.id
+                ORDER BY pg.owner_type = 'admin' ASC, pg.updated_at DESC
             ''', (owner_token, limit, offset))
             items = [dict(row) for row in cursor.fetchall()]
             for item in items:

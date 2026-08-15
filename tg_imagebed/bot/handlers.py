@@ -365,7 +365,8 @@ async def handle_photo(update: Update, context):
         file_bytes = await asyncio.wait_for(file_info.download_as_bytearray(), timeout=_DOWNLOAD_TIMEOUT)
 
         if is_group:
-            result = record_existing_telegram_file(
+            result = await asyncio.to_thread(
+                record_existing_telegram_file,
                 file_id=tg_file.file_id,
                 file_unique_id=file_unique_id,
                 file_path=getattr(file_info, 'file_path', '') or '',
@@ -381,7 +382,8 @@ async def handle_photo(update: Update, context):
                 group_chat_id=chat.id,
             )
         else:
-            result = process_upload(
+            result = await asyncio.to_thread(
+                process_upload,
                 file_content=bytes(file_bytes),
                 filename=filename,
                 content_type=content_type,
