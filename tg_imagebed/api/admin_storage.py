@@ -448,6 +448,14 @@ def modify_storage_backend(name: str):
         old_config = backends[name]
         merged_config = _merge_sensitive(new_config, old_config)
         _validate_backend_config(driver, merged_config)
+        location_fields = ('driver', 'root_dir', 'bucket', 'endpoint', 'remote', 'base_path')
+        if any(old_config.get(field) != merged_config.get(field) for field in location_fields):
+            referenced_count = count_files_by_storage_backend(name)
+            if referenced_count > 0:
+                return _admin_json({
+                    'success': False,
+                    'error': f"无法修改后端 '{name}' 的定位配置，仍有 {referenced_count} 个文件引用它。请先迁移或删除这些文件。",
+                }, 400)
 
         backends[name] = merged_config
         config['backends'] = backends
