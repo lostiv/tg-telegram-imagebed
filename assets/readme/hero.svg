@@ -44,7 +44,7 @@
           font-size="21" fill="#C9D4DE">多存储后端 · CDN · 画集分享 · 管理后台。</text>
 
     <text x="0" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-          font-size="17" fill="#6E7F92">v2.2.16</text>
+          font-size="17" fill="#6E7F92">v2.3.0</text>
     <circle cx="96" cy="258" r="2.5" fill="#6E7F92"/>
     <text x="108" y="262" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
           font-size="17" fill="#6E7F92">Flask</text>
