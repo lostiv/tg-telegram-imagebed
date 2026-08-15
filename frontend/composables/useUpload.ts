@@ -139,19 +139,30 @@ export const useUpload = () => {
       mode = 'anonymous'
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const { promise } = _xhrUpload(url, files[i], {
-        headers, withCredentials, idx: i, total: files.length, onProgress
-      })
-      try {
-        const resp = await promise
-        results.push(resp.data)
-      } catch (error: any) {
-        failures.push({
-          filename: files[i].name,
-          error: error?.message || '上传失败'
+    const orderedResults: Array<UploadResult | TokenUploadResult | undefined> = new Array(files.length)
+    const orderedFailures: Array<UploadFailure | undefined> = new Array(files.length)
+    let nextIndex = 0
+    const worker = async () => {
+      while (nextIndex < files.length) {
+        const i = nextIndex++
+        const { promise } = _xhrUpload(url, files[i], {
+          headers, withCredentials, idx: i, total: files.length, onProgress
         })
+        try {
+          const resp = await promise
+          orderedResults[i] = resp.data
+        } catch (error: any) {
+          orderedFailures[i] = {
+            filename: files[i].name,
+            error: error?.message || '上传失败'
+          }
+        }
       }
+    }
+    await Promise.all(Array.from({ length: Math.min(2, files.length) }, () => worker()))
+    for (let i = 0; i < files.length; i++) {
+      if (orderedResults[i]) results.push(orderedResults[i] as UploadResult | TokenUploadResult)
+      if (orderedFailures[i]) failures.push(orderedFailures[i] as UploadFailure)
     }
 
     // Token 模式上传后自动刷新配额

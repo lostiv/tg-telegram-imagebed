@@ -39,7 +39,7 @@ from .settings import (
     init_system_settings,
     get_system_setting, get_all_system_settings,
     update_system_setting, update_system_settings,
-    get_system_setting_int, get_upload_count_today,
+    get_system_setting_int, get_system_settings_version, get_upload_count_today,
     get_public_settings,
     is_guest_upload_allowed, is_token_upload_allowed, is_token_generation_allowed,
     disable_guest_tokens, disable_all_tokens,
@@ -124,7 +124,7 @@ __all__ = [
     # 系统设置
     'init_system_settings', 'get_system_setting', 'get_all_system_settings',
     'update_system_setting', 'update_system_settings', 'get_public_settings',
-    'get_system_setting_int', 'get_upload_count_today',
+    'get_system_setting_int', 'get_system_settings_version', 'get_upload_count_today',
     'is_guest_upload_allowed', 'is_token_upload_allowed', 'is_token_generation_allowed',
     'disable_guest_tokens', 'disable_all_tokens',
     'DEFAULT_SYSTEM_SETTINGS', 'SENSITIVE_SETTINGS',

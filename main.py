@@ -47,6 +47,7 @@ from tg_imagebed.database import (
     get_total_size,
     init_system_settings,
     get_system_setting_int,
+    get_system_settings_version,
 )
 
 # 导入服务
@@ -77,12 +78,27 @@ except (OSError, AttributeError):
 def create_app() -> Flask:
     """创建并配置 Flask 应用"""
     app = Flask(__name__, static_folder=None)
+    request_limit_cache = {'max_mb': None, 'expires_at': 0.0, 'settings_version': -1}
 
     def _get_max_upload_mb() -> int:
-        """动态读取当前上传大小限制"""
+        """读取当前上传大小限制（短 TTL 缓存）"""
         try:
-            from tg_imagebed.database import get_system_setting_int
-            return get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+            now = time.monotonic()
+            settings_version = get_system_settings_version()
+            if (
+                request_limit_cache['max_mb'] is not None
+                and now < request_limit_cache['expires_at']
+                and settings_version == request_limit_cache['settings_version']
+            ):
+                return request_limit_cache['max_mb']
+
+            max_mb = get_system_setting_int('max_file_size_mb', 100, minimum=1, maximum=1024)
+            request_limit_cache.update({
+                'max_mb': max_mb,
+                'expires_at': now + 60,
+                'settings_version': settings_version,
+            })
+            return max_mb
         except Exception:
             return 100
 
@@ -217,12 +233,7 @@ def create_app() -> Flask:
 
     @app.before_request
     def _refresh_request_limit():
-        """
-        每次请求前同步上传限制。
-
-        不然管理员在后台把 max_file_size_mb 调大以后，当前进程还是抱着启动时
-        的旧值不撒手，上传直接 413，纯属自己给自己下绊子。
-        """
+        """每次请求前按缓存同步上传限制。"""
         _apply_request_limit()
 
     @app.after_request
