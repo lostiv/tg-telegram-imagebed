@@ -76,8 +76,6 @@ def release_lock() -> None:
         else:
             if _lock_fd is not None:
                 _lock_fd.close()
-                if os.path.exists(LOCK_FILE):
-                    os.remove(LOCK_FILE)
     except Exception as e:
         logger.error(f"释放锁失败: {e}")
 

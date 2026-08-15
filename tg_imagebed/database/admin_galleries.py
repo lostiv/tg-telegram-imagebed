@@ -184,6 +184,7 @@ def admin_update_gallery(gallery_id: int, name: Optional[str] = None, descriptio
             cur.execute(f'UPDATE galleries SET {", ".join(updates)} WHERE id = ?', params)
             if cur.rowcount == 0:
                 return None
+            conn.commit()
             return admin_get_gallery(gallery_id)
     except Exception as e:
         logger.error(f"Admin 更新画集失败: {e}")

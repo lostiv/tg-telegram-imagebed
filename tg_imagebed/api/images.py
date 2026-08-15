@@ -300,6 +300,8 @@ def get_recent_api():
     """获取最近上传的文件"""
     limit = request.args.get('limit', 12, type=int)
     page = request.args.get('page', 1, type=int)
+    limit = max(1, min(100, limit))
+    page = max(1, page)
 
     try:
         recent_files = get_recent_uploads(limit, page)

@@ -625,6 +625,7 @@ def update_gallery_access(
                 from werkzeug.security import generate_password_hash
                 updates.append('password_hash = ?')
                 params.append(generate_password_hash(password))
+                updates.append('access_version = access_version + 1')
             if hide_from_share_all is not None:
                 updates.append('hide_from_share_all = ?')
                 params.append(1 if hide_from_share_all else 0)
@@ -718,6 +719,7 @@ def revoke_gallery_token_access(
                 return False
             cursor.execute('DELETE FROM gallery_token_access WHERE gallery_id = ? AND token = ?', (gallery_id, token))
             if cursor.rowcount > 0:
+                cursor.execute('UPDATE galleries SET access_version = access_version + 1 WHERE id = ?', (gallery_id,))
                 logger.info(f"撤销 Token 访问画集: gallery_id={gallery_id}, token={token[:12]}...")
                 return True
             return False

@@ -51,18 +51,6 @@ def get_fresh_file_path(file_id: str) -> Optional[str]:
     if not bot_token or not file_id:
         return None
 
-
-def delete_file_with_storage(encrypted_id: str) -> bool:
-    """删除文件记录及其存储对象，外部清理失败不阻断数据库删除。"""
-    file_info = get_file_info(encrypted_id)
-    if not file_info:
-        return False
-
-    from .token_service import TokenService
-    TokenService._try_delete_external_files([file_info])
-    deleted_count, _ = delete_files_by_ids([encrypted_id])
-    return deleted_count > 0
-
     try:
         response = requests.get(
             f"https://api.telegram.org/bot{bot_token}/getFile",
@@ -83,6 +71,18 @@ def delete_file_with_storage(encrypted_id: str) -> bool:
     except Exception as e:
         logger.error(f"获取文件路径异常: {e}")
         return None
+
+
+def delete_file_with_storage(encrypted_id: str) -> bool:
+    """删除文件记录及其存储对象，外部清理失败不阻断数据库删除。"""
+    file_info = get_file_info(encrypted_id)
+    if not file_info:
+        return False
+
+    from .token_service import TokenService
+    TokenService._try_delete_external_files([file_info])
+    deleted_count, _ = delete_files_by_ids([encrypted_id])
+    return deleted_count > 0
 
 
 def process_upload(
