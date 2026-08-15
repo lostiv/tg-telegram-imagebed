@@ -127,7 +127,10 @@ def serve_image(encrypted_id):
             request_url = request.url
             if cdn_url not in request_url:
                 logger.info(f"图片已缓存，重定向到CDN: {encrypted_id} -> {cdn_url}")
-                update_access_count(encrypted_id, access_type)
+                try:
+                    update_access_count(encrypted_id, access_type)
+                except Exception as e:
+                    logger.debug(f"更新图片访问计数失败: {encrypted_id}, {e}")
                 cdn_redirect_cache_time = get_system_setting_int('cdn_redirect_cache_time', 300, minimum=0)
                 response = redirect(cdn_url, code=302)
                 response.headers['Cache-Control'] = f'public, max-age={cdn_redirect_cache_time}'
@@ -140,7 +143,10 @@ def serve_image(encrypted_id):
                 logger.info(f"更新CDN缓存状态并直接提供图片: {encrypted_id}")
 
     # 更新访问计数
-    update_access_count(encrypted_id, access_type)
+    try:
+        update_access_count(encrypted_id, access_type)
+    except Exception as e:
+        logger.debug(f"更新图片访问计数失败: {encrypted_id}, {e}")
 
     # 生成 ETag
     etag = file_info.get('etag') or f'W/"{encrypted_id}-{file_info.get("file_size", 0)}"'
