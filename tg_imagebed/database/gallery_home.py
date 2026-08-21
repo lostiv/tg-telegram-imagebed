@@ -335,9 +335,18 @@ def _query_gallery_items(
     limit: Optional[int] = 10
 ) -> List[Dict[str, Any]]:
     params = list(where_params or [])
+    allowed_order_clauses = {
+        'image_count DESC, g.updated_at DESC',
+        'COALESCE(g.editor_pick_weight, 0) DESC, g.updated_at DESC',
+        'g.created_at DESC',
+        'g.name COLLATE NOCASE ASC, g.updated_at DESC',
+        'g.updated_at DESC',
+    }
+    if order_clause not in allowed_order_clauses:
+        order_clause = 'g.updated_at DESC'
     sql = _gallery_base_query(where_clause) + f'\nORDER BY {order_clause}'
     if limit is not None:
-        limit = _to_int(limit, 10, minimum=1, maximum=100)
+        limit = _to_int(limit, 10, minimum=1, maximum=1000)
         sql += '\nLIMIT ?'
         params.append(limit)
     cursor.execute(sql, params)
@@ -377,7 +386,7 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
             cursor = conn.cursor()
             config = get_gallery_home_config()
             sections = list_gallery_home_sections(include_items=False)
-            candidate_rows = _query_gallery_items(cursor, limit=None)
+            candidate_rows = _query_gallery_items(cursor, limit=1000)
             candidates = {int(item['id']): item for item in candidate_rows}
 
             section_results: List[Dict[str, Any]] = []
