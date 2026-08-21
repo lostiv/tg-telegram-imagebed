@@ -18,6 +18,13 @@ _VALID_AUTO_SORT = {
     'name_asc',
 }
 _VALID_HERO_MODE = {'auto', 'manual'}
+_HOME_ORDER_BY_SQL = {
+    'updated_desc': 'g.updated_at DESC',
+    'image_count_desc': 'image_count DESC, g.updated_at DESC',
+    'editor_pick_desc': 'COALESCE(g.editor_pick_weight, 0) DESC, g.updated_at DESC',
+    'created_desc': 'g.created_at DESC',
+    'name_asc': 'g.name COLLATE NOCASE ASC, g.updated_at DESC',
+}
 
 
 def _to_int(value: Any, default: int, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
@@ -98,15 +105,7 @@ def _gallery_base_query(where_clause: str = '') -> str:
 
 
 def _auto_sort_sql(auto_sort: str) -> str:
-    if auto_sort == 'image_count_desc':
-        return 'image_count DESC, g.updated_at DESC'
-    if auto_sort == 'editor_pick_desc':
-        return 'COALESCE(g.editor_pick_weight, 0) DESC, g.updated_at DESC'
-    if auto_sort == 'created_desc':
-        return 'g.created_at DESC'
-    if auto_sort == 'name_asc':
-        return 'g.name COLLATE NOCASE ASC, g.updated_at DESC'
-    return 'g.updated_at DESC'
+    return _HOME_ORDER_BY_SQL.get(auto_sort, _HOME_ORDER_BY_SQL['updated_desc'])
 
 
 def get_gallery_home_config() -> Dict[str, Any]:
@@ -331,20 +330,12 @@ def _query_gallery_items(
     *,
     where_clause: str = '',
     where_params: Optional[Sequence[Any]] = None,
-    order_clause: str = 'g.updated_at DESC',
+    order_key: str = 'updated_desc',
     limit: Optional[int] = 10
 ) -> List[Dict[str, Any]]:
     params = list(where_params or [])
-    allowed_order_clauses = {
-        'image_count DESC, g.updated_at DESC',
-        'COALESCE(g.editor_pick_weight, 0) DESC, g.updated_at DESC',
-        'g.created_at DESC',
-        'g.name COLLATE NOCASE ASC, g.updated_at DESC',
-        'g.updated_at DESC',
-    }
-    if order_clause not in allowed_order_clauses:
-        order_clause = 'g.updated_at DESC'
-    sql = _gallery_base_query(where_clause) + f'\nORDER BY {order_clause}'
+    order_sql = _HOME_ORDER_BY_SQL.get(order_key, _HOME_ORDER_BY_SQL['updated_desc'])
+    sql = _gallery_base_query(where_clause) + '\nORDER BY ' + order_sql
     if limit is not None:
         limit = _to_int(limit, 10, minimum=1, maximum=1000)
         sql += '\nLIMIT ?'
@@ -388,6 +379,32 @@ def get_gallery_home_public_payload() -> Dict[str, Any]:
             sections = list_gallery_home_sections(include_items=False)
             candidate_rows = _query_gallery_items(cursor, limit=1000)
             candidates = {int(item['id']): item for item in candidate_rows}
+
+            pinned_ids: set[int] = set()
+            for section in sections:
+                if not section.get('enabled') or section.get('source_mode') not in ('hybrid', 'manual'):
+                    continue
+                cursor.execute('''
+                    SELECT si.gallery_id
+                    FROM gallery_home_section_items si
+                    JOIN gallery_home_sections s ON s.id = si.section_id
+                    WHERE s.section_key = ?
+                    ORDER BY si.pin_order ASC, si.id ASC
+                ''', (section['section_key'],))
+                pinned_ids.update(int(r['gallery_id']) for r in cursor.fetchall())
+
+            if config.get('hero_mode') == 'manual' and config.get('hero_gallery_id'):
+                pinned_ids.add(int(config['hero_gallery_id']))
+            missing_pinned_ids = pinned_ids - candidates.keys()
+            if missing_pinned_ids:
+                placeholders = ','.join('?' * len(missing_pinned_ids))
+                pinned_rows = _query_gallery_items(
+                    cursor,
+                    where_clause=f'g.id IN ({placeholders})',
+                    where_params=sorted(missing_pinned_ids),
+                    limit=500,
+                )
+                candidates.update({int(item['id']): item for item in pinned_rows})
 
             section_results: List[Dict[str, Any]] = []
             for section in sections:

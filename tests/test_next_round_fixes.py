@@ -9,18 +9,18 @@ requests_stub = ModuleType("requests")
 requests_stub.Session = Mock
 sys.modules.setdefault("requests", requests_stub)
 
-from tg_imagebed.database.gallery_home import _query_gallery_items
+from tg_imagebed.database.gallery_home import _query_gallery_items, get_gallery_home_public_payload
 from tg_imagebed.storage.backends.telegram import TelegramBackend
 
 
 class GalleryHomeFixTests(unittest.TestCase):
-    def test_query_gallery_items_validates_order_and_applies_limit(self):
+    def test_query_gallery_items_validates_order_key_and_applies_limit(self):
         cursor = Mock()
         cursor.fetchall.return_value = []
 
         _query_gallery_items(
             cursor,
-            order_clause="g.updated_at DESC; DROP TABLE galleries",
+            order_key="; DROP TABLE galleries",
             limit=1000,
         )
 
@@ -29,6 +29,67 @@ class GalleryHomeFixTests(unittest.TestCase):
         self.assertIn("ORDER BY g.updated_at DESC", sql)
         self.assertIn("LIMIT ?", sql)
         self.assertEqual(params[-1], 1000)
+
+        _query_gallery_items(cursor, order_key="name_asc")
+        sql, _ = cursor.execute.call_args.args
+        self.assertIn("ORDER BY g.name COLLATE NOCASE ASC, g.updated_at DESC", sql)
+
+    def test_manual_gallery_is_loaded_outside_candidate_limit(self):
+        manual_item = {'id': 2001, 'name': 'Manual'}
+        cursor = Mock()
+        cursor.fetchall.side_effect = [
+            [{'gallery_id': 2001}],
+            [{'gallery_id': 2001}],
+        ]
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        connection.__enter__ = Mock(return_value=connection)
+        connection.__exit__ = Mock(return_value=False)
+
+        with patch('tg_imagebed.database.gallery_home.get_connection', return_value=connection), \
+                patch('tg_imagebed.database.gallery_home.get_gallery_home_config', return_value={
+                    'hero_mode': 'manual',
+                    'hero_gallery_id': 2001,
+                    'enable_recent_strip': False,
+                }), \
+                patch('tg_imagebed.database.gallery_home.list_gallery_home_sections', return_value=[{
+                    'section_key': 'manual',
+                    'enabled': True,
+                    'source_mode': 'manual',
+                    'max_items': 8,
+                }]), \
+                patch('tg_imagebed.database.gallery_home._query_gallery_items', side_effect=[[], [manual_item]]):
+            payload = get_gallery_home_public_payload()
+
+        self.assertEqual(payload['sections'][0]['item_ids'], [2001])
+        self.assertEqual(payload['hero']['id'], 2001)
+
+    def test_manual_gallery_in_candidates_is_not_queried_again(self):
+        manual_item = {'id': 2001, 'name': 'Manual'}
+        cursor = Mock()
+        cursor.fetchall.return_value = [{'gallery_id': 2001}]
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        connection.__enter__ = Mock(return_value=connection)
+        connection.__exit__ = Mock(return_value=False)
+
+        with patch('tg_imagebed.database.gallery_home.get_connection', return_value=connection), \
+                patch('tg_imagebed.database.gallery_home.get_gallery_home_config', return_value={
+                    'hero_mode': 'manual',
+                    'hero_gallery_id': 2001,
+                    'enable_recent_strip': False,
+                }), \
+                patch('tg_imagebed.database.gallery_home.list_gallery_home_sections', return_value=[{
+                    'section_key': 'manual',
+                    'enabled': True,
+                    'source_mode': 'manual',
+                    'max_items': 8,
+                }]), \
+                patch('tg_imagebed.database.gallery_home._query_gallery_items', return_value=[manual_item]) as query:
+            payload = get_gallery_home_public_payload()
+
+        self.assertEqual(payload['sections'][0]['item_ids'], [2001])
+        self.assertEqual(query.call_count, 1)
 
 
 class TelegramDownloadFixTests(unittest.TestCase):
