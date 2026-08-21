@@ -839,6 +839,7 @@ class TelegramBackend(StorageBackend):
             )
 
         if resp.status_code not in (200, 206):
+            resp.close()
             return DownloadResult(
                 status_code=resp.status_code,
                 content_type='text/plain',
